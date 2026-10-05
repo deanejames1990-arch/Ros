@@ -1,0 +1,18 @@
+:root{--g:#2f7350;--dk:#17261d;--lime:#d9ee7a;--bg:#f6f8f4;--mut:#5b6b60}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--dk);font:16px/1.5 system-ui,sans-serif}
+header{background:var(--g);padding:14px 20px}
+header a{color:#fff;font:700 18px Georgia,serif;text-decoration:none}
+main{max-width:860px;margin:0 auto;padding:24px 16px}
+h1,h2{font-family:Georgia,serif}h1{font-size:2rem;margin:.2em 0}
+a{color:var(--g)}
+form{display:flex;gap:8px;margin:16px 0}
+input{flex:1;padding:12px;border:1px solid #cfd8d0;border-radius:10px;font-size:1rem}
+button{background:var(--lime);border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer}
+.card{background:#fff;border:1px solid #dfe6e0;border-radius:14px;padding:14px 16px;margin:10px 0;display:block;text-decoration:none;color:inherit}
+.muted{color:var(--mut);font-size:.9rem}
+.score{font:700 1.8rem Georgia,serif}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{padding:8px 12px;border-bottom:1px solid #e7ece8;text-align:left}
+th{background:#eef3ec;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
