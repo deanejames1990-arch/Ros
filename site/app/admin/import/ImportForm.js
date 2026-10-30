@@ -100,6 +100,9 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
   const onSite = f.date && f.team1 && f.team2
     ? games.find((g) => g.date === f.date && ((same(g.t1, f.team1) && same(g.t2, f.team2)) || (same(g.t1, f.team2) && same(g.t2, f.team1))))
     : null;
+  const dateYear = Number(String(f.date || '').slice(0, 4)) || null;
+  const pickedComp = competitions.find((c) => String(c.id) === String(f.compId));
+  const yearMismatch = !onSite && pickedComp && dateYear && pickedComp.year !== dateYear;
   const replacing = Boolean(onSite) || (f.code && existingCodes.includes(f.code));
 
   function save() {
@@ -110,7 +113,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
         date: f.date, stage: f.stage, code: f.code,
         score1: { g: f.g1, p: f.p1 }, score2: { g: f.g2, p: f.p2 },
         competition: f.compId === 'new'
-          ? { name: f.newName, grade: f.newGrade, year: f.newYear, showNames: f.newShowNames }
+          ? { name: f.newName, grade: f.newGrade, year: f.newYear || dateYear, showNames: f.newShowNames }
           : { id: f.compId },
         events: parsed.events,
       });
@@ -161,7 +164,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
               <label>
                 Competition
                 <select value={f.compId} onChange={(e) => set('compId', e.target.value)}>
-                  {competitions.map((c) => (
+                  {[...competitions].sort((x, y) => (y.year === dateYear) - (x.year === dateYear)).map((c) => (
                     <option key={c.id} value={c.id}>{c.year} · {c.name}{c.grade ? ` (${c.grade})` : ''}</option>
                   ))}
                   <option value="new">+ New competition…</option>
@@ -170,6 +173,11 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
               )}
               <label>Stage / round<input value={f.stage || ''} onChange={(e) => set('stage', e.target.value)} placeholder="e.g. Round 2, Final" /></label>
             </div>
+            {yearMismatch && (
+              <p className="check ok small">
+                {pickedComp.name} is the {pickedComp.year} competition, but this game was played in {dateYear}. It will be saved under {pickedComp.name} {dateYear} (created if it doesn’t exist yet).
+              </p>
+            )}
             {onSite && (
               <p className="check ok small">
                 This game is already on the site ({onSite.competition}). Saving attaches the tagged events to it and updates the score.{' '}
@@ -179,7 +187,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
             {!onSite && f.compId === 'new' && (
               <div className="fields">
                 <label>Competition name<input value={f.newName || ''} onChange={(e) => set('newName', e.target.value)} /></label>
-                <label>Year<input type="number" value={f.newYear || ''} onChange={(e) => set('newYear', e.target.value)} /></label>
+                <label>Year<input type="number" value={f.newYear || dateYear || ''} onChange={(e) => set('newYear', e.target.value)} /></label>
                 <label>
                   Grade
                   <select value={f.newGrade} onChange={(e) => set('newGrade', e.target.value)}>

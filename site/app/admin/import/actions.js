@@ -15,9 +15,18 @@ async function findOrCreateTeam(name) {
   return data.id;
 }
 
-async function findOrCreateCompetition(c) {
-  if (c.id) return Number(c.id);
-  const year = Number(c.year);
+// A game's season is its competition's season, so the competition must belong
+// to the year the game was played. Picking "Connacht U20 (2026)" for a 2025 game
+// files it under the 2025 edition of that competition, created if needed.
+async function findOrCreateCompetition(c, matchYear) {
+  if (c.id) {
+    const { data: picked, error } = await db.from('competitions')
+      .select('id, name, grade, show_player_names, seasons(year)').eq('id', Number(c.id)).single();
+    if (error) throw new Error(`Looking up competition: ${error.message}`);
+    if (!matchYear || picked.seasons?.year === matchYear) return picked.id;
+    return findOrCreateCompetition({ name: picked.name, grade: picked.grade, year: matchYear, showNames: picked.show_player_names }, matchYear);
+  }
+  const year = Number(matchYear || c.year);
   if (!clean(c.name) || !year) throw new Error('A new competition needs a name and a year.');
   let { data: season } = await db.from('seasons').select('id').eq('year', year).maybeSingle();
   if (!season) {
@@ -83,7 +92,7 @@ export async function importGame(p) {
       if (de) throw new Error(`Clearing old events: ${de.message}`);
       matchId = existing.id;
     } else {
-      const competitionId = await findOrCreateCompetition(p.competition);
+      const competitionId = await findOrCreateCompetition(p.competition, Number(String(p.date).slice(0, 4)) || null);
       const row = {
         competition_id: competitionId, match_date: p.date, team1_id: t1, team2_id: t2, ...score,
         stage: clean(p.stage) || null, source: 'nacsport', match_code: code,
