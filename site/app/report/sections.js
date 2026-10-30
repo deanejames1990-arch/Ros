@@ -264,10 +264,13 @@ export function CompareTypes({ name, rows, href }) {
     ['Won – drawn – lost', (r) => `${r.W}–${r.D}–${r.L}`],
     ['Points for per game', (r) => f1(per(r.ptsFor, r.games)), 'hi'],
     ['Points against per game', (r) => f1(per(r.ptsAgainst, r.games)), 'lo'],
+    ['Goals scored per game', (r) => f1(per(r.goalsFor, r.games)), 'hi'],
+    ['Goals conceded per game', (r) => f1(per(r.goalsAgainst, r.games)), 'lo'],
     ['Shots per game', (r) => f1(per(r.us.shots, r.us.games)), 'hi'],
     ['Shot conversion', (r) => pc(r.us.conv), 'hi'],
     ['Points per shot', (r) => (r.us.ptsPerShot == null ? '—' : r.us.ptsPerShot.toFixed(2)), 'hi'],
     ['2-pointers scored per game', (r) => f1(per(r.us.shotsDetail.twoScored, r.us.games)), 'hi'],
+    ['2-pointers conceded per game', (r) => f1(per(r.them.shotsDetail.twoScored, r.them.games)), 'lo'],
     ['2-point attempts per game', (r) => (r.us.shotsDetail.twoTrackedGames ? `${f1(r.us.shotsDetail.twoTried / r.us.shotsDetail.twoTrackedGames)}${r.us.shotsDetail.twoTrackedGames < r.us.games ? ` (${r.us.shotsDetail.twoTrackedGames} of ${r.us.games} games)` : ''}` : 'not tagged')],
     ['Own kick-outs retained', (r) => pc(r.us.kickouts.retPct), 'hi'],
     ['Opposition kick-outs won', (r) => pc(r.them.kickouts.total - r.them.kickouts.unknown ? 100 - r.them.kickouts.retPct : null), 'hi'],
@@ -282,7 +285,7 @@ export function CompareTypes({ name, rows, href }) {
       <div className="card">
         <div className="wrap">
           <table className="nums compare">
-            <thead><tr><th>{name}, per game</th><th><a href={href('League')}>League</a></th><th><a href={href('Championship')}>Championship</a></th></tr></thead>
+            <thead><tr><th>{name}, per game</th><th><a href={href('League')}>League</a></th><th><a href={href('Championship')}><span className="long">Championship</span><span className="short">Champ</span></a></th></tr></thead>
             <tbody>
               {lines.map(([label, fn, better]) => {
                 const a = fn(L), c = fn(C);
@@ -300,7 +303,7 @@ export function CompareTypes({ name, rows, href }) {
             </tbody>
           </table>
         </div>
-        <p className="muted small">Per-game figures from the tagged games in each; results and points use every game. Bold marks the better of the two. Click League or Championship to see that report on its own.</p>
+        <p className="muted small">Per-game figures from the tagged games in each; results, points and goals use every game’s final score. Bold marks the better of the two. Click League or Championship to see that report on its own.</p>
       </div>
     </>
   );

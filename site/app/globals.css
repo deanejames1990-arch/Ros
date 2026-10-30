@@ -269,3 +269,12 @@ button.danger{background:#9b2c2c;color:#fff}
 .compare th:not(:first-child),.compare td:not(:first-child){text-align:center;width:28%}
 .compare td.better{font-weight:800;color:var(--g)}
 .compare th a{color:inherit}
+.compare .short{display:none}
+@media (max-width:560px){
+  .compare{table-layout:fixed;width:100%}
+  .compare th,.compare td{padding:7px 6px;font-size:.84rem}
+  .compare th:first-child,.compare td:first-child{width:46%}
+  .compare th:not(:first-child),.compare td:not(:first-child){width:27%;text-align:right}
+  .compare th{letter-spacing:.02em}
+  .compare .long{display:none}.compare .short{display:inline}
+}

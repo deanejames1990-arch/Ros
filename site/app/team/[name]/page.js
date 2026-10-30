@@ -125,12 +125,15 @@ export default async function TeamReport({ params, searchParams }) {
               const us = ids.includes(d.m.team1_id);
               const f = us ? 3 * d.m.team1_goals + d.m.team1_points : 3 * d.m.team2_goals + d.m.team2_points;
               const g = us ? 3 * d.m.team2_goals + d.m.team2_points : 3 * d.m.team1_goals + d.m.team1_points;
-              return [f, g];
+              const gf = us ? d.m.team1_goals : d.m.team2_goals;
+              const ga = us ? d.m.team2_goals : d.m.team1_goals;
+              return [f, g, gf || 0, ga || 0];
             });
             return {
               type: ty, games: ds.length, taggedGames: tg.length,
               W: rs.filter((x) => x === 'W').length, D: rs.filter((x) => x === 'D').length, L: rs.filter((x) => x === 'L').length,
               ptsFor: pts.reduce((n, x) => n + x[0], 0), ptsAgainst: pts.reduce((n, x) => n + x[1], 0),
+              goalsFor: pts.reduce((n, x) => n + x[2], 0), goalsAgainst: pts.reduce((n, x) => n + x[3], 0),
               us: combineSides(tg.map((d) => d.mine)), them: combineSides(tg.map((d) => d.opp)),
             };
           })}
