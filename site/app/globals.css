@@ -1,21 +1,23 @@
-:root{--g:#2f7350;--dk:#17261d;--lime:#d9ee7a;--bg:#f6f8f4;--mut:#5b6b60}
+:root{--g:#2b3c81;--gold:#f9a51b;--dk:#14203f;--lime:#f9a51b;--bg:#f5f7fb;--mut:#59627a}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--dk);font:16px/1.5 system-ui,sans-serif}
-header{background:var(--g);padding:14px 20px}
+header{background:var(--g);padding:10px 20px;border-bottom:4px solid var(--gold)}
 header a{color:#fff;font:700 18px Georgia,serif;text-decoration:none}
+header .brand{display:flex;align-items:center;gap:12px}
+header .brand img{height:44px;width:auto;display:block}
 main{max-width:860px;margin:0 auto;padding:24px 16px}
 h1,h2{font-family:Georgia,serif}h1{font-size:2rem;margin:.2em 0}
 a{color:var(--g)}
 form{display:flex;gap:8px;margin:16px 0}
-input{flex:1;padding:12px;border:1px solid #cfd8d0;border-radius:10px;font-size:1rem}
+input{flex:1;padding:12px;border:1px solid #cbd3e3;border-radius:10px;font-size:1rem}
 button{background:var(--lime);border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer}
-.card{background:#fff;border:1px solid #dfe6e0;border-radius:14px;padding:14px 16px;margin:10px 0;display:block;text-decoration:none;color:inherit}
+.card{background:#fff;border:1px solid #dde3ef;border-radius:14px;padding:14px 16px;margin:10px 0;display:block;text-decoration:none;color:inherit}
 .muted{color:var(--mut);font-size:.9rem}
 .score{font:700 1.8rem Georgia,serif}
 .wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;background:#fff}
-th,td{padding:8px 12px;border-bottom:1px solid #e7ece8;text-align:left}
-th{background:#eef3ec;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+th,td{padding:8px 12px;border-bottom:1px solid #e6eaf2;text-align:left}
+th{background:#edf1f8;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
 
 /* ---------- Match dashboard ---------- */
 main{max-width:1040px}
@@ -32,7 +34,7 @@ h3{font:700 1rem system-ui,sans-serif;margin:0 0 .6em;display:flex;align-items:c
 .scoreline .dash{color:var(--mut);font-size:1.6rem}
 
 .toolbar{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;margin:16px 0 4px}
-.seg{display:flex;flex-wrap:wrap;background:#fff;border:1px solid #dfe6e0;border-radius:10px;padding:3px;gap:2px}
+.seg{display:flex;flex-wrap:wrap;background:#fff;border:1px solid #dde3ef;border-radius:10px;padding:3px;gap:2px}
 .seg a{padding:6px 12px;border-radius:7px;text-decoration:none;color:var(--dk);font-size:.9rem;font-weight:600}
 .seg a.on{background:var(--dk);color:#fff}
 
@@ -46,7 +48,7 @@ h3{font:700 1rem system-ui,sans-serif;margin:0 0 .6em;display:flex;align-items:c
 .vs-row .num{font-size:.95rem}
 .vs-row .num:first-child{text-align:right}
 .vs-label{text-align:center;font-size:.85rem;color:var(--mut)}
-.vs-bar{height:12px;background:#eef3ec;border-radius:4px;display:flex;overflow:hidden}
+.vs-bar{height:12px;background:#edf1f8;border-radius:4px;display:flex;overflow:hidden}
 .vs-bar.left{justify-content:flex-end}
 .vs-bar span{display:block;height:100%;border-radius:4px}
 @media (max-width:560px){
@@ -56,15 +58,15 @@ h3{font:700 1rem system-ui,sans-serif;margin:0 0 .6em;display:flex;align-items:c
 
 .chart{margin:0}
 .chart svg{width:100%;height:auto;display:block}
-.chart .grid{stroke:#e7ece8;stroke-width:1}
+.chart .grid{stroke:#e6eaf2;stroke-width:1}
 .chart .ht{stroke:#b9c4bc;stroke-dasharray:3 3}
 .chart .tick{font:11px system-ui,sans-serif;fill:var(--mut)}
 .chart .end-label{font:700 12px system-ui,sans-serif;fill:var(--dk)}
 .chart figcaption{margin-top:6px}
 
 table.nums td:not(:first-child),table.nums th:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
-tr.dim td{color:#b3bdb6}
-tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
+tr.dim td{color:#b3bac9}
+tr.total td{font-weight:700;border-top:2px solid #cbd3e3}
 .small-table{margin-top:12px}
 .small-table th,.small-table td{padding:5px 8px;font-size:.88rem}
 
@@ -77,8 +79,8 @@ tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
 .stack span{display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;min-width:22px}
 .won-clean{background:var(--c);color:#fff}
 .won-break{background:color-mix(in srgb,var(--c) 55%,#fff);color:var(--dk)}
-.lost-break{background:#d9dfda;color:var(--dk)}
-.lost-clean{background:#8e9a92;color:#fff}
+.lost-break{background:#d8deea;color:var(--dk)}
+.lost-clean{background:#8b94a8;color:#fff}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:.8rem;color:var(--mut)}
 .legend span{display:flex;align-items:center}
 .legend .sw{margin-left:0}
@@ -91,7 +93,7 @@ tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
 .hbar-scores{display:block;height:100%}
 .hbar-val{font-variant-numeric:tabular-nums;color:var(--mut);white-space:nowrap}
 
-.log{max-height:520px;overflow:auto;border:1px solid #dfe6e0;border-radius:10px}
+.log{max-height:520px;overflow:auto;border:1px solid #dde3ef;border-radius:10px}
 .log table{font-size:.85rem}
 .log th{position:sticky;top:0}
 .log td{white-space:nowrap}
@@ -119,27 +121,27 @@ tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
 .badge{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;font-weight:800;font-size:.85rem}
 .badge.W{background:#dcefe2;color:#1d6a3a}
 .badge.L{background:#f6dede;color:#9b2c2c}
-.badge.D{background:#ecefe9;color:#4f5b53}
-.badge.N{background:#ecefe9;color:#8a948d}
+.badge.D{background:#eceff5;color:#4e5669}
+.badge.N{background:#eceff5;color:#8a91a3}
 @media (max-width:560px){.game{grid-template-columns:auto 1fr}.game-meta{grid-column:2;text-align:left}}
 
 /* ---------- Import ---------- */
 .import{display:grid;gap:12px}
 .import .card{margin:0}
-.drop{display:block;border:2px dashed #b9c8bc;border-radius:14px;padding:22px;text-align:center;background:#fff;cursor:pointer;font-weight:600}
+.drop{display:block;border:2px dashed #b7c2d9;border-radius:14px;padding:22px;text-align:center;background:#fff;cursor:pointer;font-weight:600}
 .drop input{display:block;margin:0 auto 8px;max-width:100%}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;margin-top:10px}
 .fields label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut);font-weight:600}
-.fields input,.fields select{font:inherit;color:var(--dk);padding:9px 10px;border:1px solid #cfd8d0;border-radius:8px;background:#fff;flex:none}
+.fields input,.fields select{font:inherit;color:var(--dk);padding:9px 10px;border:1px solid #cbd3e3;border-radius:8px;background:#fff;flex:none}
 .fields .check-row{flex-direction:row;align-items:center;gap:8px}
 .scores{display:grid;gap:8px}
 .score-row{display:grid;grid-template-columns:minmax(8rem,1fr) 4.5rem auto 4.5rem auto;align-items:center;gap:8px}
-.score-row input{padding:8px;border:1px solid #cfd8d0;border-radius:8px;font:inherit;width:100%}
+.score-row input{padding:8px;border:1px solid #cbd3e3;border-radius:8px;font:inherit;width:100%}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{background:#eef3ec;border-radius:999px;padding:4px 10px;font-size:.82rem}
+.chip{background:#edf1f8;border-radius:999px;padding:4px 10px;font-size:.82rem}
 .import button:disabled{opacity:.5;cursor:default}
 .check.warn{color:#7a4a06}
-header{display:flex;justify-content:space-between;align-items:center}header a.nav{font:600 .9rem system-ui,sans-serif;color:#e6f2d0}
+header{display:flex;justify-content:space-between;align-items:center}header a.nav{font:600 .9rem system-ui,sans-serif;color:#fde3b0}
 .chart .end-label{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .team-chips{margin:4px 0 12px}
 .team-chips .chip{text-decoration:none;color:var(--dk);font-weight:600}
@@ -153,26 +155,29 @@ header{display:flex;justify-content:space-between;align-items:center}header a.na
 
 /* ---------- Report sections ---------- */
 .center{text-align:center}
-.takeaway{font-weight:700;margin:14px 0 4px;padding-top:12px;border-top:1px solid #e7ece8}
+.takeaway{font-weight:700;margin:14px 0 4px;padding-top:12px;border-top:1px solid #e6eaf2}
 .zones{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
 @media (max-width:560px){.zones{grid-template-columns:1fr}}
 .zone-title{text-align:center;font-weight:700;font-size:.85rem;margin-bottom:6px}
 .zone-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
-.zone{position:relative;border:1px solid #dfe6e0;border-radius:6px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fafcf9}
+.zone{position:relative;border:1px solid #dde3ef;border-radius:6px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fafbfd}
 .zone b{font-size:1.15rem;line-height:1}
 .zone-no{position:absolute;top:3px;left:6px;font-size:.68rem;color:var(--mut)}
 .zone-wl{font-size:.7rem;color:var(--dk);margin-top:2px}
-.thirds{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cfd8d0;border-radius:10px;overflow:hidden}
-.third{padding:14px 8px;text-align:center;border-right:2px dashed #d7c27a}
+.thirds{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cbd3e3;border-radius:10px;overflow:hidden}
+.third{padding:14px 8px;text-align:center;border-right:2px dashed var(--gold)}
 .third:last-child{border-right:0}
-.third.att{background:#f3f6f1}
+.third.att{background:#f0f3f9}
 .third-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--mut)}
 .third-nums{display:flex;justify-content:center;gap:18px;margin-top:8px}
 .third-nums div{display:flex;flex-direction:column}
 .third-nums b{font:700 2rem Georgia,serif;font-variant-numeric:tabular-nums}
-.third-nums b.lost{color:#b4432f}
+.third-nums b.lost{color:#9b2c2c}
 .third-nums span{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
 @media (max-width:560px){.third-nums{gap:10px}.third-nums b{font-size:1.5rem}}
 .game-strip{margin:8px 0 6px}
 .game.untagged{opacity:.6}
 .report-link{margin:4px 0 10px;font-weight:600}
+
+.seg a.on{background:var(--g)}
+h1,h2{color:var(--dk)}

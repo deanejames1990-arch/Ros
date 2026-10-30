@@ -7,8 +7,8 @@ import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection } from 
 
 export const dynamic = 'force-dynamic';
 
-const ROS = '#1f5fa8'; // Roscommon blue
-const OPP = '#b8760f'; // opposition amber
+const ROS = '#3b4f9e'; // Roscommon blue (crest blue, lifted for chart contrast)
+const OPP = '#c4572a'; // opposition burnt orange
 
 export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();

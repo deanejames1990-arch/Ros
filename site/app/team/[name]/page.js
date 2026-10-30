@@ -6,8 +6,8 @@ import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection } from 
 
 export const dynamic = 'force-dynamic';
 
-const TEAM = '#1f5fa8'; // the team the report is about
-const OPP = '#b8760f'; // everyone they played
+const TEAM = '#3b4f9e'; // the team the report is about (crest blue)
+const OPP = '#c4572a'; // everyone they played
 
 export default async function TeamReport({ params, searchParams }) {
   const name = decodeURIComponent(params.name);
