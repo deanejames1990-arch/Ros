@@ -86,6 +86,11 @@ export async function importGame(p) {
         : { ...score };
       if (code) upd.match_code = code;
       if (clean(p.stage)) upd.stage = clean(p.stage);
+      // Keep the date in step with the file, and keep the game in its
+      // competition's edition for the year it was played (fixes games that
+      // were filed under another season).
+      upd.match_date = p.date;
+      upd.competition_id = await findOrCreateCompetition({ id: existing.competition_id }, Number(String(p.date).slice(0, 4)) || null);
       const { error } = await db.from('matches').update(upd).eq('id', existing.id);
       if (error) throw new Error(`Updating the game: ${error.message}`);
       const { error: de } = await db.from('events').delete().eq('match_id', existing.id);

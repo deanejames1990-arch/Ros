@@ -180,7 +180,8 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
             )}
             {onSite && (
               <p className="check ok small">
-                This game is already on the site ({onSite.competition}). Saving attaches the tagged events to it and updates the score.{' '}
+                This game is already on the site ({onSite.competition}{onSite.year ? `, ${onSite.year}` : ''}). Saving attaches the tagged events to it and updates the score.
+                {onSite.year && dateYear && onSite.year !== dateYear ? ` It will also move to the ${dateYear} edition of the competition, to match the date.` : ''}{' '}
                 <a href={`/match/${onSite.id}`}>View it</a>
               </p>
             )}
