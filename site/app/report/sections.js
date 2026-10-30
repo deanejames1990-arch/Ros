@@ -184,9 +184,20 @@ const COLS = [
   { k: 'koWon', label: 'KOs won' },
   { k: 'freesWon', label: 'Frees won' },
   { k: 'turnoversLost', label: 'T/O lost' },
+  { k: 'tackles', label: 'Tackles' },
+  { k: 'winbacks', label: 'Winbacks' },
+  { k: 'assists', label: 'Assists' },
 ];
 
-export function PlayerTable({ T, s, multi = false, limit = 12 }) {
+export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false }) {
+  if (hidden) {
+    return (
+      <div className="card">
+        <h3><i className="sw" style={{ background: T.color }} />{T.name}</h3>
+        <p className="muted small">Player names are hidden for this competition (underage).</p>
+      </div>
+    );
+  }
   const list = s.players || [];
   const tagged = list.reduce((n, p) => n + p.points, 0);
   if (!list.length) {

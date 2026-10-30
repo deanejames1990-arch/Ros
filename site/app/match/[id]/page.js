@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
-import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf } from '../../../lib/analysis';
+import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -17,7 +17,7 @@ export default async function Match({ params, searchParams }) {
   const view = searchParams.view === 'analyst' ? 'analyst' : 'coach';
   const period = PERIODS.includes(searchParams.period) ? searchParams.period : 'All';
 
-  const [{ data: apps }, events] = await Promise.all([
+  const [{ data: apps }, rawEvents] = await Promise.all([
     db.from('appearances').select('team_id, jersey_no, started, goals, points, sub_on_minute, sub_off_minute, players(id,name)')
       .eq('match_id', m.id).order('jersey_no'),
     loadEvents(m.id),
@@ -28,6 +28,8 @@ export default async function Match({ params, searchParams }) {
   const colors = teams.map((_, i) => (rosIdx === -1 ? (i === 0 ? ROS : OPP) : i === rosIdx ? ROS : OPP));
   const [A, B] = teams.map((t, i) => ({ ...t, color: colors[i] }));
 
+  // Underage competitions hide player names everywhere on the page.
+  const events = showNames ? rawEvents : withoutNames(rawEvents);
   const r = analyseMatch({ events, teams, match: m, period });
   const a = r.byTeam[A.id];
   const b = r.byTeam[B.id];
@@ -170,8 +172,8 @@ export default async function Match({ params, searchParams }) {
 
           <h2>Players</h2>
           <div className="players-stack">
-            <PlayerTable T={A} s={a} />
-            <PlayerTable T={B} s={b} />
+            <PlayerTable T={A} s={a} hidden={!showNames} />
+            <PlayerTable T={B} s={b} hidden={!showNames} />
           </div>
 
           <h2>Where the scores came from</h2>
@@ -255,7 +257,8 @@ export default async function Match({ params, searchParams }) {
           </div>
           <p className="muted small">Pitch areas are from the point of view of the team named on the event.</p>
 
-          <h2>Event log <span className="muted">· {r.events.length} events</span></h2>
+          <details className="log-details">
+            <summary><h2>Event log <span className="muted">· {r.events.length} events</span></h2></summary>
           <div className="wrap log">
             <table>
               <thead><tr><th>Min</th><th>Qtr</th><th>Team</th><th>Event</th><th>Outcome</th><th>Player</th><th>Detail</th></tr></thead>
@@ -280,6 +283,7 @@ export default async function Match({ params, searchParams }) {
               </tbody>
             </table>
           </div>
+          </details>
           {r.otherTypes.length > 0 && (
             <p className="muted small">Also tagged (shown in the log only): {r.otherTypes.join(', ')}.</p>
           )}

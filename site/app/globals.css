@@ -197,3 +197,8 @@ h1,h2{color:var(--dk)}
 .more-toggle:checked ~ .more-label .show{display:none}
 .more-toggle:checked ~ .more-label .hide{display:inline}
 .more-toggle:focus-visible ~ .more-label{outline:2px solid var(--g);outline-offset:2px}
+.log-details summary{cursor:pointer;list-style:none}
+.log-details summary::-webkit-details-marker{display:none}
+.log-details summary h2{display:inline-block}
+.log-details summary h2::before{content:"▸ ";color:var(--g)}
+.log-details[open] summary h2::before{content:"▾ "}

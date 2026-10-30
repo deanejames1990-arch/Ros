@@ -5,9 +5,12 @@
 //   "TA/TB"      categories like "TA POSS", "TB SHOT (P)", "TA KICKOUT"
 //                (TA is Roscommon in the county analysis files)
 //   "HOME/AWAY"  categories like "HOME SHOT", "AWAY KICK OUT", "HOME TURNOVER LOST"
+//   "OUR/OPP"    categories like "OUR POSSESSION", "OPP SHOT FROM PLAY", "WINBACK",
+//                "TACKLE" (OUR is Roscommon; won/lost is always from our side;
+//                names are always our players; HIGH/MIDDLE/LOW is our end-to-end)
 // Anything else is kept in the event log with its original name.
 
-const MISS = ['WIDE', 'SHORT', 'BLOCK', 'SAVE', 'POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK'];
+const MISS = ['WIDE', 'SHORT', 'BLOCK', 'BLOCKED', 'SAVE', 'SAVED', 'POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK', 'MISS'];
 const SOURCES = {
   'FROM KO OWN': 'Own Kickout',
   'FROM KO OPP': 'Opp Kickout',
@@ -47,7 +50,37 @@ const title = (s) =>
 // A player name: letters (and ' . -) with at least one space, not a known tag.
 const isName = (t) =>
   !KNOWN.has(t) && /^[A-ZÁÉÍÓÚ'’.\- ]+$/i.test(t) && /\s/.test(t.trim()) &&
-  !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD)\b/i.test(t);
+  !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD|KICKOUT|PASS|POSS|ATT|SCORE|MISS|TURNOVER|WINBACK|UNFORCED|OPP|OUR|SCORABLE|UNSCORABLE|PHASE|PLACED|CHANCE|ATTEMPT|TEAM|WON|LOST|SO|PSR|OPSR|PS|OPS|TECHNICAL|THROW|THIRD|WIDE|SHORT|LONG|HIGH|LOW|MIDDLE|SAVED|BLOCKED|R)\b/i.test(t);
+// The OUR/OPP template writes names as "J. CURRAN".
+const isInitialName = (t) => /^[A-Z]{1,2}\.\s?[A-Z][A-Z'’ -]+$/.test(t);
+
+const OUROPP = {
+  'OUR POSSESSION': ['A', 'POSS'], 'OPP POSSESSION': ['B', 'POSS'],
+  'ATTACK': ['A', 'ATTACK'], 'OUR ATTACK': ['A', 'ATTACK'], 'OPP ATTACK': ['B', 'ATTACK'],
+  'SHOT FROM PLAY': ['A', 'SHOT (P)'], 'OUR SHOT FROM PLAY': ['A', 'SHOT (P)'], 'OPP SHOT FROM PLAY': ['B', 'SHOT (P)'],
+  'SHOT FROM FREE': ['A', 'SHOT (F)'], 'OUR SHOT FROM FREE': ['A', 'SHOT (F)'], 'OPP SHOT FROM FREE': ['B', 'SHOT (F)'],
+  'OUR KICKOUT': ['A', 'KICKOUT'], 'OPPONENT KICKOUT': ['B', 'KICKOUT'], 'OPP KICKOUT': ['B', 'KICKOUT'],
+  'TURNOVER': ['A', 'TURNOVER'], 'UNFORCED TO': ['A', 'TURNOVER', 'Unforced'],
+  'WINBACK': ['B', 'TURNOVER', null, true], 'UNFORCED WB': ['B', 'TURNOVER', 'Unforced', true],
+  'FREE WON': ['A', 'FREE WON'], 'FREE CONCEDED': ['A', 'FOUL'],
+  'OUR CARD': ['A', 'CARD'], 'OPP CARD': ['B', 'CARD'],
+  'TACKLE': ['A', 'TACKLE'], 'ASSIST': ['A', 'ASSIST'],
+};
+const OUROPP_SKIP = /^(OUR|OPP) KO RESULT$/;
+
+// "PS OUR KICKOUT", "OPS OPP TO", "WINBACK SO"... -> a possession source, from the side's view.
+function ouroppSource(phrase, side) {
+  const p = phrase.replace(/^(PS|OPS) /, '').replace(/ SO$/, '').trim();
+  const ours = side === 'A';
+  if (/^(WINBACK|TURNOVER|OPP TO|OUR TO|UNFORCED( WB| TO)?)$/.test(p)) return 'Turnover';
+  if (p === 'OUR KICKOUT') return ours ? 'Own Kickout' : 'Opp Kickout';
+  if (p === 'OPP KICKOUT') return ours ? 'Opp Kickout' : 'Own Kickout';
+  if (p === 'OUR SHOT SHORT') return ours ? 'Rebound' : 'Opp shot dropped short';
+  if (p === 'OPP SHOT SHORT') return ours ? 'Opp shot dropped short' : 'Rebound';
+  if (p === 'THROW IN') return 'Throw Up';
+  if (/TECHNICAL FREE/.test(p)) return 'Free';
+  return null;
+}
 
 export function readTables(json) {
   const tabs = {};
@@ -60,8 +93,12 @@ export function readTables(json) {
 
 // Guess teams, date, competition and stage from the file name.
 export function guessFromName(name = '', videoName = '') {
-  const base = name.replace(/\.(json|nac_to_import)$/i, '').replace(/_/g, ' ').replace(/\(.*?\)/g, ' ').replace(/[.\s]+$/, '').trim();
-  const m = base.match(/^(.*?)\s+(?:v|vs|v\.|versus)\s+(.+)$/i);
+  const clean = (x) => x.replace(/\.(json|nac_to_import|mp4|mov)$/i, '').replace(/_/g, ' ').replace(/\(.*?\)/g, ' ').replace(/[.\s]+$/, '').trim();
+  let base = clean(name);
+  const vs = /^(.*?)\s+(?:v|vs|v\.|versus)\s+(.+)$/i;
+  // No "A v B" in the file name? Use the video's name instead.
+  if (!vs.test(base) && vs.test(clean(videoName))) base = clean(videoName);
+  const m = base.match(vs);
   let home = '', away = '';
   if (m) {
     home = m[1].trim().split(/\s+/).pop();
@@ -83,11 +120,11 @@ export function guessFromName(name = '', videoName = '') {
   else if (/\bFBD\b/.test(u)) competition = 'FBD League';
 
   let stage = '';
-  const r = u.match(/\bNFL\s?(\d+)\b|\bRD?\s?(\d+[AB]?)\b|\bROUND\s?(\d+[AB]?)\b/);
+  const r = u.match(/\bNFL\s?(\d+)\b|\bRD?\s?(\d+[AB]?)\b|\bROUND\s?(\d+[AB]?)\b|\bCHAMP\s?(\d+)\b/);
   if (/\bFINAL\b/.test(u)) stage = /SEMI/.test(u) ? 'Semi-final' : /QUARTER/.test(u) ? 'Quarter-final' : 'Final';
   else if (/\bSF\b|SEMI/.test(u)) stage = 'Semi-final';
   else if (/\bQF\b|QUARTER/.test(u)) stage = 'Quarter-final';
-  else if (r) stage = `Round ${r[1] || r[2] || r[3]}`;
+  else if (r) stage = `Round ${r[1] || r[2] || r[3] || r[4]}`;
 
   return { home, away, date, competition, stage, code: base };
 }
@@ -108,7 +145,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
 
   const cats = new Set(meds.map((m) => m.Categoria));
   const template = [...cats].some((c) => /^T[AB]\s/.test(c)) ? 'TA/TB'
-    : [...cats].some((c) => /^(HOME|AWAY)\s/.test(c)) ? 'HOME/AWAY' : 'Unknown';
+    : [...cats].some((c) => /^(HOME|AWAY)\s/.test(c)) ? 'HOME/AWAY'
+    : [...cats].some((c) => /^(OUR|OPP|OPPONENT)\s/.test(String(c).toUpperCase())) ? 'OUR/OPP' : 'Unknown';
 
   // ---- Halves and quarters -------------------------------------------------
   const obs = (m) => String(m.Observacion || '').toUpperCase();
@@ -124,8 +162,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
 
   const tagHalf = (m) => {
     const t = tagsOf(m);
-    if (t.includes('1ST HALF')) return 1;
-    if (t.includes('2ND HALF')) return 2;
+    if (t.includes('1ST HALF') || t.includes('1ST H')) return 1;
+    if (t.includes('2ND HALF') || t.includes('2ND H')) return 2;
     return null;
   };
   // If no 2nd-half start was marked, use the first event tagged 2ND HALF.
@@ -158,13 +196,22 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   for (const m of meds) {
     const cat = String(m.Categoria || '').trim().toUpperCase();
     if (!cat || SKIP_CATS.test(cat)) continue;
-    const t = tagsOf(m);
-    const players = [...new Set([...t.filter(isName), ...(isName(obs(m)) ? [obs(m)] : [])])].map(title);
+    if (template === 'OUR/OPP' && OUROPP_SKIP.test(cat)) continue;
+    let t = tagsOf(m);
+    const ouropp = template === 'OUR/OPP';
+    let players = ouropp
+      ? [...new Set(t.filter(isInitialName))].map(title)
+      : [...new Set([...t.filter(isName), ...(isName(obs(m)) ? [obs(m)] : [])])].map(title);
 
-    let side = null, rest = cat;
+    let side = null, rest = cat, ooType = null, winback = false;
     const sm = cat.match(/^(TA|TB|HOME|AWAY)\s+(.*)$/);
     if (sm) { side = sm[1] === 'TA' || sm[1] === 'HOME' ? 'A' : 'B'; rest = sm[2].trim(); }
+    if (ouropp && OUROPP[cat]) [side, rest, ooType, winback] = OUROPP[cat];
     const other = side === 'A' ? 'B' : side === 'B' ? 'A' : null;
+    if (ouropp) {
+      // Normalise this template's tags to the shared vocabulary.
+      t = t.flatMap((x) => (x === '2 POINT SCORE' ? ['2 POINT'] : x === 'POINT FROM PLACED' ? ['POINT'] : [x]));
+    }
 
     const ev = {
       side,
@@ -174,17 +221,36 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       minute: minuteOf(m),
       start_sec: Math.round((m.TI / fps) * 10) / 10,
       end_sec: Math.round(((m.TF || m.TI) / fps) * 10) / 10,
-      player_no: players[0] || null,
+      player_no: null,
       code: m.Categoria,
       labels: { Half: halfOf(m) === 1 ? '1st Half' : '2nd Half', Quarter: quarterOf(m) },
       nac_id: m['Id_Medición'],
     };
-    if (players.length) ev.labels.Players = players.join(', ');
     const area = t.find((x) => AREAS[x]);
     if (area) ev.labels.PitchArea = AREAS[area];
+    if (ouropp && !area) {
+      // HIGH / MIDDLE / LOW run along the pitch from our point of view.
+      const hml = t.find((x) => x === 'HIGH' || x === 'MIDDLE' || x === 'LOW');
+      if (hml) {
+        const ours = { HIGH: 'Attacking Third', MIDDLE: 'Middle Third', LOW: 'Own Third' }[hml];
+        ev.labels.PitchArea = side === 'B' ? { 'Attacking Third': 'Own Third', 'Middle Third': 'Middle Third', 'Own Third': 'Attacking Third' }[ours] : ours;
+      }
+    }
+    if (ouropp) {
+      const src = t.map((x) => (/^(PS|OPS) /.test(x) || / SO$/.test(x) ? ouroppSource(x, side) : null)).find(Boolean);
+      if (src) ev.labels[rest === 'POSS' ? 'PossFrom' : 'Source'] = src;
+      if (ooType) ev.labels.TurnoverType = ooType;
+      if (winback) {
+        // A winback is the other side's turnover; the names are our players who won it.
+        if (players.length) ev.labels.WonBackBy = players.join(', ');
+        players = [];
+      }
+    }
     // Hub box number (BOX 0-15): where a kick-out landed or a shot was taken.
     const boxTag = t.find((x) => /^BOX \d+$/.test(x));
     if (boxTag) ev.labels.Zone = title(boxTag);
+
+    if (players.length) { ev.player_no = players[0]; ev.labels.Players = players.join(', '); }
 
     if (rest === 'POSS') {
       ev.event_type = 'Poss';
@@ -193,14 +259,14 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     } else if (/^SHOT\b|^45$/.test(rest)) {
       const placed = /\(F\)/.test(rest) || rest === '45' || t.includes('FROM FREE');
       ev.event_type = rest === '45' ? 'Shot (45)' : placed ? 'Shot (F)' : 'Shot (P)';
-      const missTag = t.find((x) => MISS.includes(x));
+      const missTag = MISS.find((x) => t.includes(x));
       const scored = t.includes('GOAL') || t.includes('POINT') || t.includes('SCORE') || (t.includes('2 POINT') && !missTag);
       ev.outcome = scored
         ? t.includes('GOAL') ? 'Goal' : t.includes('2 POINT') ? '2 Point' : 'Point'
         : missTag ? title(missTag.replace('SHORT_SAVE_BLOCK', 'Short/Save/Block')) : 'No score';
-      if (!scored && t.includes('2 POINT')) ev.labels.Attempt = '2 Point';
+      if (!scored && (t.includes('2 POINT') || t.includes('2 POINT ATTEMPT'))) ev.labels.Attempt = '2 Point';
       if (t.includes('GOAL CHANCE')) ev.labels.GoalChance = 'Yes';
-      let src = rest === '45' ? '45' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])];
+      let src = rest === '45' ? '45' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
       // The HOME/AWAY template only marks frees, so everything else is open play.
       if (!src && template === 'HOME/AWAY') src = 'From play';
       if (src) ev.labels.Source = src;
@@ -208,7 +274,15 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       ev.event_type = 'Kickout';
       let winner = null, how = null;
       const tok = t.find((x) => /^T[AB] (CLEAN|BREAK|SL|FREE)$/.test(x));
-      if (tok) {
+      if (ouropp) {
+        // Won / lost is always from our side, whoever kicked it.
+        const hv = t.find((x) => /^(WON|LOST) (CLEAN|BREAK)$/.test(x));
+        const res = hv || t.find((x) => /^(WON|LOST) KO$/.test(x));
+        if (res) winner = res.startsWith('WON') ? 'A' : 'B';
+        if (hv) how = title(hv.split(' ')[1]);
+        // Names on kick-outs are our players; only credit them when we won it.
+        if (winner !== 'A' && players.length) { delete ev.labels.Players; ev.player_no = null; }
+      } else if (tok) {
         winner = tok.startsWith('TA') ? 'A' : 'B';
         how = { CLEAN: 'Clean', BREAK: 'Break', SL: 'Sideline', FREE: 'Free' }[tok.split(' ')[1]];
       } else {
@@ -218,8 +292,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
         else if (t.includes('LOST')) winner = other;
       }
       ev.outcome = winner ? `${names[winner]} ${how || 'Unspecified'}` : null;
-      const len = t.find((x) => /^(LONG|SHORT|MEDIUM)( KO)?$/.test(x));
-      if (len) ev.labels.KickoutDistance = len[0] + 'KO';
+      const len = t.find((x) => /^(OPP )?(LONG|SHORT|MEDIUM)( KO| KICKOUT)?$/.test(x));
+      if (len) ev.labels.KickoutDistance = len.replace(/^OPP /, '')[0] + 'KO';
       const setup = t.find((x) => /^\d-\d/.test(x));
       if (setup) ev.labels.Setup = title(setup);
       if (!winner) warnings.push(`Kick-out at ${ev.minute}′ (${ev.half}) has no winner tagged.`);
@@ -238,6 +312,12 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       ev.event_type = 'Card';
       const c = t.find((x) => ['YELLOW', 'RED', 'BLACK'].includes(x));
       ev.outcome = c ? title(c) : null;
+    } else if (rest === 'TACKLE') {
+      ev.event_type = 'Tackle';
+    } else if (rest === 'ASSIST') {
+      ev.event_type = 'Assist';
+      const how = t.find((x) => /PASS$/.test(x));
+      if (how) ev.labels.How = title(how);
     } else if (cat === 'THROW IN') {
       ev.event_type = 'Throw In';
     } else {

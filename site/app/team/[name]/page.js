@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
-import { analyseMatch, combineSides } from '../../../lib/analysis';
+import { analyseMatch, combineSides, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
@@ -27,7 +27,8 @@ export default async function TeamReport({ params, searchParams }) {
 
   // Analyse every tagged game and keep this team's side and the opposition's side.
   const done = await Promise.all(games.map(async (m) => {
-    const events = await loadEvents(m.id);
+    const raw = await loadEvents(m.id);
+    const events = m.competitions?.show_player_names === false ? withoutNames(raw) : raw;
     if (!events.length) return { m, tagged: false };
     const t = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const r = analyseMatch({ events, teams: t });

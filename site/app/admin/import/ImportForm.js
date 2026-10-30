@@ -55,7 +55,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
       const team1 = matchName(teams, g.home);
       const team2 = matchName(teams, g.away);
       // In the TA/TB template TA is Roscommon; in HOME/AWAY the first-named team is home.
-      const aIsTeam1 = first.template === 'TA/TB' ? !/roscommon/i.test(team2) || /roscommon/i.test(team1) : true;
+      const aIsTeam1 = first.template === 'TA/TB' || first.template === 'OUR/OPP' ? !/roscommon/i.test(team2) || /roscommon/i.test(team1) : true;
       const year = Number((g.date || '').slice(0, 4)) || new Date().getFullYear();
       const comp = competitions.find(
         (c) => c.year === year && g.competition && c.name.toLowerCase().includes(g.competition.toLowerCase().split(' ')[0])
@@ -138,7 +138,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
               <label>First-named team<input list="teamnames" value={f.team1 || ''} onChange={(e) => set('team1', e.target.value)} /></label>
               <label>Second-named team<input list="teamnames" value={f.team2 || ''} onChange={(e) => set('team2', e.target.value)} /></label>
               <label>
-                {parsed.template === 'HOME/AWAY' ? 'HOME in the tags is' : 'TA in the tags is'}
+                {parsed.template === 'HOME/AWAY' ? 'HOME in the tags is' : parsed.template === 'OUR/OPP' ? 'OUR in the tags is' : 'TA in the tags is'}
                 <select value={f.aIsTeam1 ? '1' : '2'} onChange={(e) => set('aIsTeam1', e.target.value === '1')}>
                   <option value="1">{f.team1 || 'First-named team'}</option>
                   <option value="2">{f.team2 || 'Second-named team'}</option>

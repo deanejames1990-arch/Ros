@@ -279,7 +279,8 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     const key = name.trim();
     return (playerRows[tid][key.toLowerCase()] ||= {
       name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0,
-      frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0, boxes: {},
+      frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
+      tackles: 0, assists: 0, winbacks: 0, boxes: {},
     });
   };
   const namesOf = (e) => {
@@ -287,6 +288,10 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     return list.length ? list : e.player_no ? [String(e.player_no)] : [];
   };
   for (const e of events) {
+    const wonBy = String(lbl(e, 'WonBackBy') || '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (e.event_type === 'Turnover' && wonBy.length) {
+      for (const n of wonBy) { const r = prow(other(e.team_id), n); if (r) r.winbacks += 1; }
+    }
     const names = namesOf(e);
     if (!names.length) continue;
     if (isShot(e)) {
@@ -312,6 +317,8 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       for (const n of names) { const r = prow(other(e.team_id), n); if (r) r.freesWon += 1; }
     } else if (e.event_type === 'Turnover') {
       for (const n of names) { const r = prow(e.team_id, n); if (r) r.turnoversLost += 1; }
+    } else if (e.event_type === 'Tackle' || e.event_type === 'Assist') {
+      for (const n of names) { const r = prow(e.team_id, n); if (r) r[e.event_type === 'Tackle' ? 'tackles' : 'assists'] += 1; }
     } else if (e.event_type === 'Card') {
       for (const n of names) { const r = prow(e.team_id, n); if (r) r.cards += 1; }
     }
@@ -352,7 +359,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
   }
 
   const unknownTypes = [...new Set(all.map((e) => e.event_type))].filter(
-    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul', 'Attack', 'Throw In'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
+    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul', 'Attack', 'Throw In', 'Tackle', 'Assist', 'Card'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
   );
   const has = (type) => all.some((e) => e.event_type === type);
   const hasLabel = (k) => all.some((e) => lbl(e, k));
@@ -365,7 +372,14 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
 }
 
 export const sortPlayers = (list) =>
-  list.sort((a, b) => b.points - a.points || b.shots - a.shots || b.poss - a.poss || b.koWon - a.koWon || a.name.localeCompare(b.name));
+  list.sort((a, b) => b.points - a.points || b.shots - a.shots || b.poss - a.poss || (b.tackles + b.winbacks) - (a.tackles + a.winbacks) || b.koWon - a.koWon || a.name.localeCompare(b.name));
+
+// Removes player names from events (competitions where names are hidden, e.g. underage).
+export const withoutNames = (events) => events.map((e) => {
+  const labels = { ...(e.labels || {}) };
+  delete labels.Players; delete labels.WonBackBy;
+  return { ...e, player_no: null, labels };
+});
 
 // ---- Combining games ------------------------------------------------------
 // Sums one side's numbers across several games (a team page: "Armagh, 5 games")
@@ -406,7 +420,7 @@ export function combineSides(list) {
       const k = pl.name.toLowerCase();
       const o = out.players[k];
       if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes } }; continue; }
-      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards']) o[f] += pl[f];
+      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
     }
     for (const r of s.sources || []) {
