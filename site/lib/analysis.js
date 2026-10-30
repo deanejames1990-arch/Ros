@@ -1,0 +1,232 @@
+// Match analysis built from the Nacsport events table.
+// Pure functions: no database calls, so this can be tested with plain data.
+//
+// Conventions read from the tagging (Connacht SFC v Mayo, 2026):
+//   Poss      team_id = team gaining possession, labels.PossFrom = how they got it
+//   Shot (…)  team_id = shooting team, outcome = Point / Goal / Wide / …
+//   Kickout   team_id = kicking team, outcome = "<Team> Clean" / "<Team> Break"
+//   Turnover  team_id = team that LOST the ball, labels.PitchArea from their view
+//   Foul      team_id = team that conceded the foul
+
+export const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
+export const PERIODS = ['All', '1st Half', '2nd Half', ...QUARTERS];
+
+const lbl = (e, k) => (e.labels && typeof e.labels === 'object' ? e.labels[k] : undefined);
+const pct = (a, b) => (b ? Math.round((100 * a) / b) : null);
+
+export const isShot = (e) => (e.event_type || '').toLowerCase().startsWith('shot');
+
+// Points value of a shot: 3 for a goal, 2 for a two-pointer, 1 for a point, 0 otherwise.
+export function shotValue(e) {
+  const o = (e.outcome || '').toLowerCase().trim();
+  const t = (e.event_type || '').toLowerCase();
+  if (!o) return 0;
+  if (o.includes('goal')) return 3;
+  if (/\b2\s*(pt|point|pointer)s?\b|two[- ]?point/.test(o)) return 2;
+  if (/\bpoint\b/.test(o)) return /\(\s*2/.test(t) || /2\s*p(t|oint)/.test(t) ? 2 : 1;
+  return 0;
+}
+
+export function quarterOf(e) {
+  const q = lbl(e, 'Quarter');
+  if (q) return q;
+  const m = Number(e.minute) || 0;
+  const second = (e.half || '').startsWith('2');
+  return second ? (m < 17.5 || m >= 35 && m < 52.5 ? 'Q3' : 'Q4') : (m < 17.5 ? 'Q1' : 'Q2');
+}
+
+export const halfOf = (e) => e.half || lbl(e, 'Half') || (['Q3', 'Q4'].includes(quarterOf(e)) ? '2nd Half' : '1st Half');
+
+function inPeriod(e, period) {
+  if (!period || period === 'All') return true;
+  if (period.startsWith('Q')) return quarterOf(e) === period;
+  return halfOf(e) === period;
+}
+
+// Which team a kick-out outcome names ("Mayo Break" -> Mayo).
+function winnerOf(outcome, teams) {
+  const o = (outcome || '').toLowerCase();
+  let best = null;
+  for (const t of teams) {
+    const n = t.name.toLowerCase();
+    const first = n.split(/\s+/)[0];
+    if (o.startsWith(n) || o.startsWith(first)) {
+      if (!best || n.length > best.name.length) best = t;
+    }
+  }
+  return best;
+}
+const ko = (outcome) => (/clean/i.test(outcome || '') ? 'Clean' : /break/i.test(outcome || '') ? 'Break' : 'Other');
+
+// Game-clock minute from the start of the match. If the 2nd half restarts the
+// clock at 0, shift it by the length of the 1st half.
+function elapsedMinutes(events) {
+  const firstMax = Math.max(0, ...events.filter((e) => halfOf(e).startsWith('1')).map((e) => Number(e.minute) || 0));
+  const secondMin = Math.min(Infinity, ...events.filter((e) => halfOf(e).startsWith('2')).map((e) => Number(e.minute) || 0));
+  const shift = secondMin < firstMax ? Math.max(35, Math.ceil(firstMax)) : 0;
+  return (e) => (Number(e.minute) || 0) + (halfOf(e).startsWith('2') ? shift : 0);
+}
+
+const order = (a, b) =>
+  (Number(a.start_sec ?? a.minute) || 0) - (Number(b.start_sec ?? b.minute) || 0) || (a.id || 0) - (b.id || 0);
+
+export function analyseMatch({ events: raw = [], teams, match = null, period = 'All' }) {
+  const all = [...raw].sort(order);
+  const elapsed = elapsedMinutes(all);
+
+  // Attribute every shot to the possession it came from, using the full game
+  // so that filtering by quarter doesn't lose the possession before a shot.
+  const lastPoss = {};
+  const shotSource = new Map();
+  for (const e of all) {
+    if (e.event_type === 'Poss') lastPoss[e.team_id] = e;
+    else if (isShot(e)) shotSource.set(e, lbl(lastPoss[e.team_id], 'PossFrom') || 'Unknown');
+  }
+
+  const events = all.filter((e) => inPeriod(e, period));
+  const other = (tid) => teams.find((t) => t.id !== tid)?.id;
+
+  const byTeam = {};
+  for (const t of teams) {
+    const mine = events.filter((e) => e.team_id === t.id);
+    const shots = mine.filter(isShot).map((e) => ({ e, value: shotValue(e), source: shotSource.get(e) }));
+    const scored = shots.filter((s) => s.value > 0);
+    const poss = mine.filter((e) => e.event_type === 'Poss');
+    const turnoversLost = mine.filter((e) => e.event_type === 'Turnover');
+    const turnoversWon = events.filter((e) => e.team_id === other(t.id) && e.event_type === 'Turnover');
+    const fouls = mine.filter((e) => e.event_type === 'Foul');
+
+    // PSS by quarter
+    const pss = QUARTERS.map((q) => {
+      const inQ = (e) => quarterOf(e) === q;
+      const qs = shots.filter((s) => inQ(s.e));
+      return {
+        q,
+        poss: poss.filter(inQ).length,
+        shots: qs.length,
+        scores: qs.filter((s) => s.value > 0).length,
+        points: qs.reduce((n, s) => n + s.value, 0),
+      };
+    });
+
+    // Own kick-outs
+    const kos = mine.filter((e) => e.event_type === 'Kickout').map((e) => {
+      const w = winnerOf(e.outcome, teams);
+      return { e, won: w ? w.id === t.id : null, how: ko(e.outcome), dist: lbl(e, 'KickoutDistance') || '—' };
+    });
+    const koSplit = {
+      wonClean: kos.filter((k) => k.won === true && k.how === 'Clean').length,
+      wonBreak: kos.filter((k) => k.won === true && k.how !== 'Clean').length,
+      lostBreak: kos.filter((k) => k.won === false && k.how !== 'Clean').length,
+      lostClean: kos.filter((k) => k.won === false && k.how === 'Clean').length,
+      unknown: kos.filter((k) => k.won === null).length,
+    };
+    const dists = [...new Set(kos.map((k) => k.dist))].sort();
+    const koByDist = dists.map((d) => {
+      const ks = kos.filter((k) => k.dist === d);
+      const won = ks.filter((k) => k.won).length;
+      return { dist: d, total: ks.length, won, pct: pct(won, ks.length) };
+    });
+
+    // Source of scores
+    const sources = {};
+    for (const s of shots) {
+      const r = (sources[s.source] ||= { source: s.source, shots: 0, scores: 0, points: 0 });
+      r.shots += 1;
+      if (s.value) { r.scores += 1; r.points += s.value; }
+    }
+    const sourceRows = Object.values(sources)
+      .map((r) => ({ ...r, conv: pct(r.scores, r.shots) }))
+      .sort((a, b) => b.points - a.points || b.shots - a.shots);
+
+    // Shots by area and by outcome
+    const tally = (list, key) => {
+      const m = {};
+      for (const s of list) {
+        const k = key(s) || '—';
+        const r = (m[k] ||= { key: k, shots: 0, scores: 0, points: 0 });
+        r.shots += 1;
+        if (s.value) { r.scores += 1; r.points += s.value; }
+      }
+      return Object.values(m).sort((a, b) => b.shots - a.shots);
+    };
+    const count = (list, key) => {
+      const m = {};
+      for (const e of list) m[key(e) || '—'] = (m[key(e) || '—'] || 0) + 1;
+      return Object.entries(m).map(([key, n]) => ({ key, n })).sort((a, b) => b.n - a.n);
+    };
+
+    // Shooters (by jersey number; names come from line-outs when loaded)
+    const shooters = tally(shots, (s) => s.e.player_no).map((r) => ({
+      ...r,
+      wides: shots.filter((s) => (s.e.player_no || '—') === r.key && /wide/i.test(s.e.outcome || '')).length,
+    }));
+
+    const goals = scored.filter((s) => s.value === 3).length;
+    const pointsTotal = scored.reduce((n, s) => n + s.value, 0);
+
+    byTeam[t.id] = {
+      team: t,
+      goals,
+      points: pointsTotal - 3 * goals, // points column of the scoreline (two-pointers count as 2)
+      total: pointsTotal,
+      possessions: poss.length,
+      shots: shots.length,
+      scores: scored.length,
+      conv: pct(scored.length, shots.length),
+      possToScore: pct(scored.length, poss.length),
+      wides: shots.filter((s) => /wide/i.test(s.e.outcome || '')).length,
+      turnoversWon: turnoversWon.length,
+      turnoversLost: turnoversLost.length,
+      fouls: fouls.length,
+      pss,
+      kickouts: { total: kos.length, ...koSplit, retained: koSplit.wonClean + koSplit.wonBreak, retPct: pct(koSplit.wonClean + koSplit.wonBreak, kos.length - koSplit.unknown), byDist: koByDist },
+      sources: sourceRows,
+      shotsByArea: tally(shots, (s) => lbl(s.e, 'PitchArea')),
+      shotsByOutcome: count(shots.map((s) => s.e), (e) => e.outcome),
+      possFrom: count(poss, (e) => lbl(e, 'PossFrom')),
+      turnoversLostByArea: count(turnoversLost, (e) => lbl(e, 'PitchArea')),
+      foulsByArea: count(fouls, (e) => lbl(e, 'PitchArea')),
+      shooters,
+    };
+  }
+
+  // Scoring flow: cumulative points for each team through the game (full game only).
+  const flow = teams.map((t) => {
+    let run = 0;
+    const pts = [{ min: 0, total: 0 }];
+    for (const e of all) {
+      if (e.team_id !== t.id || !isShot(e)) continue;
+      const v = shotValue(e);
+      if (!v) continue;
+      run += v;
+      pts.push({ min: elapsed(e), total: run, value: v, player: e.player_no, outcome: e.outcome });
+    }
+    return { team: t, points: pts };
+  });
+  const endMin = Math.max(70, ...all.map(elapsed));
+  const halfTime = Math.max(0, ...all.filter((e) => halfOf(e).startsWith('1')).map(elapsed));
+
+  // Data check: does the tagged data reproduce the official scoreline?
+  let check = null;
+  if (match && period === 'All') {
+    const full = byTeam;
+    check = teams.map((t, i) => {
+      const officialG = i === 0 ? match.team1_goals : match.team2_goals;
+      const officialP = i === 0 ? match.team1_points : match.team2_points;
+      const tg = full[t.id];
+      return {
+        team: t.name,
+        tagged: `${tg.goals}-${tg.points}`,
+        official: `${officialG ?? 0}-${officialP ?? 0}`,
+        ok: (officialG ?? 0) * 3 + (officialP ?? 0) === tg.total,
+      };
+    });
+  }
+
+  const unknownTypes = [...new Set(all.map((e) => e.event_type))].filter(
+    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
+  );
+
+  return { period, events, byTeam, flow, endMin, halfTime, elapsed, check, otherTypes: unknownTypes, total: all.length };
+}
