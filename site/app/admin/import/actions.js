@@ -42,49 +42,57 @@ export async function importGame(p) {
     if (!p.date) throw new Error('Please enter the match date.');
     const [t1, t2] = await Promise.all([findOrCreateTeam(p.team1), findOrCreateTeam(p.team2)]);
     if (t1 === t2) throw new Error('The two teams are the same.');
-    const competitionId = await findOrCreateCompetition(p.competition);
 
-    const row = {
-      competition_id: competitionId,
-      match_date: p.date,
-      team1_id: t1,
-      team2_id: t2,
+    const score = {
       team1_goals: Number(p.score1.g) || 0,
       team1_points: Number(p.score1.p) || 0,
       team2_goals: Number(p.score2.g) || 0,
       team2_points: Number(p.score2.p) || 0,
-      stage: clean(p.stage) || null,
-      source: 'nacsport',
-      match_code: clean(p.code) || null,
     };
+    const code = clean(p.code) || null;
 
-    // Same game already on the site? Match on the file's code first, then on
-    // competition + date + teams (either order), which the database keeps unique.
-    let matchId = null;
-    if (row.match_code) {
-      const { data: existing } = await db.from('matches').select('id').eq('match_code', row.match_code).limit(1);
-      matchId = existing?.[0]?.id ?? null;
+    // Is this game already on the site? Match on the file's code, then on date and
+    // teams in either order, whatever competition it was filed under.
+    let existing = null;
+    if (code) {
+      const { data } = await db.from('matches').select('id, team1_id, team2_id, competition_id').eq('match_code', code).limit(1);
+      existing = data?.[0] || null;
     }
-    if (!matchId) {
-      for (const [a, b] of [[t1, t2], [t2, t1]]) {
-        const { data: same, error } = await db.from('matches').select('id')
-          .eq('competition_id', competitionId).eq('match_date', row.match_date)
-          .eq('team1_id', a).eq('team2_id', b).limit(1);
-        if (error) throw new Error(`Checking for this game: ${error.message}`);
-        if (same?.length) { matchId = same[0].id; break; }
-      }
+    if (!existing) {
+      const { data, error } = await db.from('matches').select('id, team1_id, team2_id, competition_id')
+        .eq('match_date', p.date)
+        .or(`and(team1_id.eq.${t1},team2_id.eq.${t2}),and(team1_id.eq.${t2},team2_id.eq.${t1})`)
+        .limit(1);
+      if (error) throw new Error(`Checking for this game: ${error.message}`);
+      existing = data?.[0] || null;
     }
-    const existed = Boolean(matchId);
-    if (matchId) {
-      const { error } = await db.from('matches').update(row).eq('id', matchId);
+
+    let matchId;
+    if (existing) {
+      // Keep the game's own competition and team order; flip the score if the
+      // teams are stored the other way round.
+      const flipped = existing.team1_id === t2;
+      const upd = flipped
+        ? { team1_goals: score.team2_goals, team1_points: score.team2_points, team2_goals: score.team1_goals, team2_points: score.team1_points }
+        : { ...score };
+      if (code) upd.match_code = code;
+      if (clean(p.stage)) upd.stage = clean(p.stage);
+      const { error } = await db.from('matches').update(upd).eq('id', existing.id);
       if (error) throw new Error(`Updating the game: ${error.message}`);
-      const { error: de } = await db.from('events').delete().eq('match_id', matchId);
+      const { error: de } = await db.from('events').delete().eq('match_id', existing.id);
       if (de) throw new Error(`Clearing old events: ${de.message}`);
+      matchId = existing.id;
     } else {
+      const competitionId = await findOrCreateCompetition(p.competition);
+      const row = {
+        competition_id: competitionId, match_date: p.date, team1_id: t1, team2_id: t2, ...score,
+        stage: clean(p.stage) || null, source: 'nacsport', match_code: code,
+      };
       const { data, error } = await db.from('matches').insert(row).select('id').single();
       if (error) throw new Error(`Adding the game: ${error.message}`);
       matchId = data.id;
     }
+    const existed = Boolean(existing);
 
     // TA / HOME side -> whichever team the user picked.
     const sideTeam = p.aIsTeam1 ? { A: t1, B: t2 } : { A: t2, B: t1 };

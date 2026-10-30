@@ -25,7 +25,7 @@ function readExport(bytes, name) {
 const matchName = (list, guess) =>
   list.find((t) => t.toLowerCase() === (guess || '').toLowerCase()) || guess || '';
 
-export default function ImportForm({ teams, competitions, existingCodes }) {
+export default function ImportForm({ teams, competitions, existingCodes, games = [] }) {
   const [src, setSrc] = useState(null); // { json, fileName }
   const [err, setErr] = useState(null);
   const [f, setF] = useState({});
@@ -86,7 +86,11 @@ export default function ImportForm({ teams, competitions, existingCodes }) {
     : null;
   const tot = (g, p) => 3 * (Number(g) || 0) + (Number(p) || 0);
   const mismatch = tagged && (tot(tagged.t1.g, tagged.t1.p) !== tot(f.g1, f.p1) || tot(tagged.t2.g, tagged.t2.p) !== tot(f.g2, f.p2));
-  const replacing = f.code && existingCodes.includes(f.code);
+  const same = (x, y) => (x || '').trim().toLowerCase() === (y || '').trim().toLowerCase();
+  const onSite = f.date && f.team1 && f.team2
+    ? games.find((g) => g.date === f.date && ((same(g.t1, f.team1) && same(g.t2, f.team2)) || (same(g.t1, f.team2) && same(g.t2, f.team1))))
+    : null;
+  const replacing = Boolean(onSite) || (f.code && existingCodes.includes(f.code));
 
   function save() {
     setResult(null);
@@ -141,6 +145,9 @@ export default function ImportForm({ teams, competitions, existingCodes }) {
                 </select>
               </label>
               <label>Date<input type="date" value={f.date || ''} onChange={(e) => set('date', e.target.value)} /></label>
+              {onSite ? (
+                <label>Competition<input value={onSite.competition} disabled /></label>
+              ) : (
               <label>
                 Competition
                 <select value={f.compId} onChange={(e) => set('compId', e.target.value)}>
@@ -150,9 +157,16 @@ export default function ImportForm({ teams, competitions, existingCodes }) {
                   <option value="new">+ New competition…</option>
                 </select>
               </label>
+              )}
               <label>Stage / round<input value={f.stage || ''} onChange={(e) => set('stage', e.target.value)} placeholder="e.g. Round 2, Final" /></label>
             </div>
-            {f.compId === 'new' && (
+            {onSite && (
+              <p className="check ok small">
+                This game is already on the site ({onSite.competition}). Saving attaches the tagged events to it and updates the score.{' '}
+                <a href={`/match/${onSite.id}`}>View it</a>
+              </p>
+            )}
+            {!onSite && f.compId === 'new' && (
               <div className="fields">
                 <label>Competition name<input value={f.newName || ''} onChange={(e) => set('newName', e.target.value)} /></label>
                 <label>Year<input type="number" value={f.newYear || ''} onChange={(e) => set('newYear', e.target.value)} /></label>
@@ -205,7 +219,7 @@ export default function ImportForm({ teams, competitions, existingCodes }) {
           <button type="button" onClick={save} disabled={pending || !f.date || !f.team1 || !f.team2}>
             {pending ? 'Saving…' : replacing ? 'Update this game' : 'Save game'}
           </button>
-          {replacing && <span className="muted small"> This file was loaded before — saving replaces its events.</span>}
+          {replacing && <span className="muted small"> Any events already saved for this game are replaced.</span>}
         </>
       )}
     </div>

@@ -8,7 +8,7 @@ export default async function ImportPage() {
   const [{ data: teams }, { data: comps }, { data: recent }] = await Promise.all([
     db.from('teams').select('id,name').order('name'),
     db.from('competitions').select('id,name,grade,seasons(year)').order('id', { ascending: false }),
-    db.from('matches').select('match_code').not('match_code', 'is', null),
+    db.from('matches').select('id, match_date, match_code, team1:teams!team1_id(name), team2:teams!team2_id(name), competitions(name)'),
   ]);
   const competitions = (comps || [])
     .map((c) => ({ id: c.id, name: c.name, grade: c.grade, year: c.seasons?.year }))
@@ -25,7 +25,10 @@ export default async function ImportPage() {
       <ImportForm
         teams={(teams || []).map((t) => t.name)}
         competitions={competitions}
-        existingCodes={(recent || []).map((r) => r.match_code)}
+        existingCodes={(recent || []).map((r) => r.match_code).filter(Boolean)}
+        games={(recent || []).map((r) => ({
+          id: r.id, date: r.match_date, t1: r.team1?.name || '', t2: r.team2?.name || '', competition: r.competitions?.name || '',
+        }))}
       />
     </>
   );
