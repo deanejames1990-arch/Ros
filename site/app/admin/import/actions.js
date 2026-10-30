@@ -58,10 +58,21 @@ export async function importGame(p) {
       match_code: clean(p.code) || null,
     };
 
+    // Same game already on the site? Match on the file's code first, then on
+    // competition + date + teams (either order), which the database keeps unique.
     let matchId = null;
     if (row.match_code) {
       const { data: existing } = await db.from('matches').select('id').eq('match_code', row.match_code).limit(1);
       matchId = existing?.[0]?.id ?? null;
+    }
+    if (!matchId) {
+      for (const [a, b] of [[t1, t2], [t2, t1]]) {
+        const { data: same, error } = await db.from('matches').select('id')
+          .eq('competition_id', competitionId).eq('match_date', row.match_date)
+          .eq('team1_id', a).eq('team2_id', b).limit(1);
+        if (error) throw new Error(`Checking for this game: ${error.message}`);
+        if (same?.length) { matchId = same[0].id; break; }
+      }
     }
     const existed = Boolean(matchId);
     if (matchId) {
@@ -94,7 +105,12 @@ export async function importGame(p) {
     }));
     for (let i = 0; i < rows.length; i += 500) {
       const { error } = await db.from('events').insert(rows.slice(i, i + 500));
-      if (error) throw new Error(`Saving events: ${error.message}`);
+      if (error) {
+        // Don't leave a new game behind with half its events.
+        await db.from('events').delete().eq('match_id', matchId);
+        if (!existed) await db.from('matches').delete().eq('id', matchId);
+        throw new Error(`Saving events: ${error.message}`);
+      }
     }
     return { ok: true, matchId, replaced: existed, count: rows.length };
   } catch (e) {
