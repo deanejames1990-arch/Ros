@@ -60,9 +60,16 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
       // In the TA/TB template TA is Roscommon; in HOME/AWAY the first-named team is home.
       const aIsTeam1 = first.template === 'TA/TB' || first.template === 'OUR/OPP' ? !/roscommon/i.test(team2) || /roscommon/i.test(team1) : true;
       const year = Number((g.date || '').slice(0, 4)) || new Date().getFullYear();
-      const comp = competitions.find(
-        (c) => c.year === year && g.competition && c.name.toLowerCase().includes(g.competition.toLowerCase().split(' ')[0])
-      );
+      // Match an existing competition on year, name and grade. A senior guess
+      // never lands in an underage competition, and the reverse.
+      const gGrade = g.grade || (g.competition ? 'Senior' : '');
+      const sameGrade = (c) => !gGrade || (c.grade || 'Senior') === gGrade;
+      const words = (g.competition || '').toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !['sfc', 'gaa', 'the'].includes(w));
+      const comp = g.competition
+        ? competitions
+          .filter((c) => c.year === year && sameGrade(c) && c.name.toLowerCase().includes(words[0] || '§'))
+          .sort((x, y) => words.filter((w) => y.name.toLowerCase().includes(w)).length - words.filter((w) => x.name.toLowerCase().includes(w)).length)[0]
+        : null;
       const tA = first.score.A, tB = first.score.B;
       const s1 = aIsTeam1 ? tA : tB, s2 = aIsTeam1 ? tB : tA;
       setF({
@@ -72,7 +79,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
         code: g.code,
         compId: comp ? String(comp.id) : 'new',
         newName: g.competition,
-        newGrade: 'Senior',
+        newGrade: g.grade || 'Senior',
         newYear: year,
         newShowNames: true,
         g1: s1.g, p1: s1.p, g2: s2.g, p2: s2.p,

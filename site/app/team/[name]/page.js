@@ -19,7 +19,12 @@ export default async function TeamReport({ params, searchParams }) {
   const { data: all } = await db.from('matches').select(MATCH_SELECT)
     .or(`team1_id.in.(${ids.join(',')}),team2_id.in.(${ids.join(',')})`)
     .order('match_date', { ascending: false });
-  const grade = searchParams.grade || '';
+  // Grades this team has games in, senior first. Senior and underage numbers
+  // shouldn't be mixed, so open on Senior (or the only grade) unless asked.
+  const ORDER = ['Senior', 'Junior', 'U21', 'U20', 'Minor', 'U17', 'Club'];
+  const grades = [...new Set((all || []).map((m) => m.competitions?.grade).filter(Boolean))]
+    .sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
+  const grade = searchParams.grade === 'all' ? '' : searchParams.grade || grades[0] || '';
   const year = Number(searchParams.year) || null;
   const games = (all || []).filter(
     (m) => (!grade || m.competitions?.grade === grade) && (!year || m.competitions?.seasons?.year === year)
@@ -55,8 +60,8 @@ export default async function TeamReport({ params, searchParams }) {
   const years = [...new Set((all || []).map((m) => m.competitions?.seasons?.year).filter(Boolean))].sort((x, y) => y - x);
   const link = (o) => {
     const p = new URLSearchParams();
-    const yr = o.year ?? year; const gr = o.grade ?? grade;
-    if (yr) p.set('year', yr); if (gr) p.set('grade', gr);
+    const yr = o.year ?? year; const gr = o.grade ?? (grade || 'all');
+    if (yr) p.set('year', yr); if (gr && gr !== grades[0]) p.set('grade', gr);
     const s = p.toString();
     return `/team/${encodeURIComponent(teamName)}${s ? `?${s}` : ''}`;
   };
@@ -65,14 +70,22 @@ export default async function TeamReport({ params, searchParams }) {
     <>
       <p className="muted"><a href="/">All games</a></p>
       <div className="hero">
-        <h1>{teamName}</h1>
+        <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}</h1>
+      </div>
+      <nav className="toolbar">
+        {grades.length > 1 && (
+          <div className="seg">
+            {grades.map((g) => <a key={g} href={link({ grade: g })} className={grade === g ? 'on' : ''}>{g}</a>)}
+            <a href={link({ grade: 'all' })} className={!grade ? 'on' : ''}>All grades</a>
+          </div>
+        )}
         {years.length > 1 && (
           <div className="seg">
             <a href={link({ year: 0 })} className={!year ? 'on' : ''}>All seasons</a>
             {years.map((y) => <a key={y} href={link({ year: y })} className={year === y ? 'on' : ''}>{y}</a>)}
           </div>
         )}
-      </div>
+      </nav>
       <p className="muted">
         {tagged.length} tagged game{tagged.length === 1 ? '' : 's'} combined
         {games.length > tagged.length && ` · ${games.length - tagged.length} more without tags`}. Numbers are totals across the games; rates are worked out from the totals.
@@ -85,7 +98,7 @@ export default async function TeamReport({ params, searchParams }) {
             <a key={m.id} href={`/match/${m.id}`} className={`card game ${t ? '' : 'untagged'}`}>
               <span className={`badge ${r.res}`}>{r.res}</span>
               <span className="game-main"><b>v {r.opp}</b><span className="num">{r.line}</span></span>
-              <span className="muted small game-meta">{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}</span>
+              <span className="muted small game-meta">{!grade && m.competitions?.grade ? `${m.competitions.grade} · ` : ''}{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}</span>
             </a>
           );
         })}

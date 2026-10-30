@@ -141,7 +141,8 @@ export function guessFromName(name = '', videoName = '') {
   else if (/\bQF\b|QUARTER/.test(u)) stage = 'Quarter-final';
   else if (r) stage = `Round ${r[1] || r[2] || r[3] || r[4]}`;
 
-  return { home, away, date, competition, stage, code: base };
+  const grade = /\bU-?20\b|UNDER[- ]?20/.test(u) ? 'U20' : /\bU-?21\b/.test(u) ? 'U21' : /\bMINOR\b|\bU-?17\b/.test(u) ? 'Minor' : /\bJUNIOR\b/.test(u) ? 'Junior' : '';
+  return { home, away, date, competition, stage, grade, code: base };
 }
 
 // Main entry: json = parsed export; names = { A, B } display names for each side.
