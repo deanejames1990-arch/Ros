@@ -73,6 +73,14 @@ export function KickoutSection({ A, B, a, b }) {
   );
 }
 
+// "of 7 tried", or a note when missed two-point attempts aren't tagged.
+function twoNote(d, games = 1) {
+  const g = d.twoTrackedGames || 0;
+  if (!g) return 'attempts not tagged';
+  if (games > 1 && g < games) return `${d.twoScoredTracked} of ${d.twoTried} tried in ${g} of ${games} games`;
+  return `of ${d.twoTried} tried`;
+}
+
 export function ShootingSection({ A, B, a, b }) {
   const da = a.shotsDetail, db = b.shotsDetail;
   const boxes = [...new Set([...Object.keys(a.shotBoxes || {}), ...Object.keys(b.shotBoxes || {})])].sort((x, y) => x - y);
@@ -90,7 +98,7 @@ export function ShootingSection({ A, B, a, b }) {
           { label: 'Points per shot', a: a.ptsPerShot, b: b.ptsPerShot, max: 1.2, fmt: (v) => (v == null ? '—' : v.toFixed(2)) },
           { heading: 'What happened to the shots' },
           { label: 'Single points', a: da.singles, b: db.singles },
-          { label: '2-pointers scored', a: da.twoScored, b: db.twoScored, aNote: `of ${da.twoTried} tried`, bNote: `of ${db.twoTried} tried` },
+          { label: '2-pointers scored', a: da.twoScored, b: db.twoScored, aNote: twoNote(da, a.games), bNote: twoNote(db, b.games) },
           { label: 'Goals', a: da.goals, b: db.goals },
           { label: 'Wides', a: da.wides, b: db.wides },
           { label: 'Saved / blocked', a: da.savedBlocked, b: db.savedBlocked },
@@ -177,8 +185,8 @@ const COLS = [
   { k: 'conv', label: 'Conv', fmt: (p) => (p.shots ? `${Math.round((100 * p.scores) / p.shots)}%` : '—'), need: 'shots' },
   { k: 'oneScored', label: '1-pt', need: 'oneTried', title: 'Single points scored' },
   { k: 'oneTried', label: '1-pt att', title: 'Single-point attempts (any shot that wasn’t a 2-point attempt or a goal)' },
-  { k: 'twoScored', label: '2-pt', need: 'twoTried', title: 'Two-pointers scored' },
-  { k: 'twoTried', label: '2-pt att', title: 'Two-point attempts' },
+  { k: 'twoScored', label: '2-pt', title: 'Two-pointers scored' },
+  { k: 'twoTried', label: '2-pt att', title: 'Two-point attempts (only where missed attempts are tagged)', fmt: (p) => (p.twoTrackedGames ? p.twoTried || '—' : 'n/t'), need: 'twoTrackedGames' },
   { k: 'goals', label: 'Goals' },
   { k: 'frees', label: 'Frees', fmt: (p) => (p.frees ? `${p.freesScored}/${p.frees}` : '—') },
   { k: 'wides', label: 'Wides' },
@@ -237,6 +245,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
       )}
       <p className="muted small">
         From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal; att = attempts (scored + missed).
+        {list.some((p) => p.twoScored) && !list.some((p) => p.twoTrackedGames) && ' Missed two-point attempts aren’t tagged in this data (n/t), so they count as 1-pt attempts.'}
         {s.total > tagged && ` ${s.total - tagged} of ${T.name}’s ${s.total} points have no shooter tagged.`}
         {' '}Spelling differences in the tags show as separate players for now.
       </p>
@@ -258,7 +267,8 @@ export function CompareTypes({ name, rows, href }) {
     ['Shots per game', (r) => f1(per(r.us.shots, r.us.games)), 'hi'],
     ['Shot conversion', (r) => pc(r.us.conv), 'hi'],
     ['Points per shot', (r) => (r.us.ptsPerShot == null ? '—' : r.us.ptsPerShot.toFixed(2)), 'hi'],
-    ['2-pointers scored / tried per game', (r) => (r.us.games ? `${f1(r.us.shotsDetail.twoScored / r.us.games)} / ${f1(r.us.shotsDetail.twoTried / r.us.games)}` : '—')],
+    ['2-pointers scored per game', (r) => f1(per(r.us.shotsDetail.twoScored, r.us.games)), 'hi'],
+    ['2-point attempts per game', (r) => (r.us.shotsDetail.twoTrackedGames ? `${f1(r.us.shotsDetail.twoTried / r.us.shotsDetail.twoTrackedGames)}${r.us.shotsDetail.twoTrackedGames < r.us.games ? ` (${r.us.shotsDetail.twoTrackedGames} of ${r.us.games} games)` : ''}` : 'not tagged')],
     ['Own kick-outs retained', (r) => pc(r.us.kickouts.retPct), 'hi'],
     ['Opposition kick-outs won', (r) => pc(r.them.kickouts.total - r.them.kickouts.unknown ? 100 - r.them.kickouts.retPct : null), 'hi'],
     ['Turnovers won per game', (r) => f1(per(r.us.turnoversWon, r.us.games)), 'hi'],

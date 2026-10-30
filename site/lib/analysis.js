@@ -107,6 +107,9 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
   }
 
   const events = all.filter((e) => inPeriod(e, period));
+  // Some taggers only mark a two-pointer when it's scored, so a missed attempt
+  // looks like any other wide. Attempts only count where a missed one is tagged.
+  const twoTracked = all.some((e) => isShot(e) && lbl(e, 'Attempt') === '2 Point');
   const other = (tid) => teams.find((t) => t.id !== tid)?.id;
 
   const byTeam = {};
@@ -193,7 +196,9 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     const isTwo = (s) => s.value === 2 || lbl(s.e, 'Attempt') === '2 Point' || /2\s*p(oin)?t/i.test(s.e.outcome || '');
     const shotsDetail = {
       singles: scored.filter((s) => s.value === 1).length,
-      twoTried: shots.filter(isTwo).length,
+      twoTried: twoTracked ? shots.filter(isTwo).length : 0,
+      twoScoredTracked: twoTracked ? scored.filter((s) => s.value === 2).length : 0,
+      twoTrackedGames: twoTracked ? 1 : 0,
       twoScored: scored.filter((s) => s.value === 2).length,
       goals,
       wides: shots.filter((s) => !s.value && /wide/i.test(s.e.outcome || '')).length,
@@ -280,7 +285,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     return (playerRows[tid][key.toLowerCase()] ||= {
       name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0, oneTried: 0, oneScored: 0,
       frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
-      tackles: 0, assists: 0, winbacks: 0, boxes: {},
+      tackles: 0, assists: 0, winbacks: 0, boxes: {}, twoTrackedGames: twoTracked ? 1 : 0,
     });
   };
   const namesOf = (e) => {
@@ -303,7 +308,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       r.shots += 1; r.points += v;
       if (v) r.scores += 1;
       if (v === 3) r.goals += 1;
-      if (two) { r.twoTried += 1; if (v === 2) r.twoScored += 1; }
+      if (two) { if (twoTracked) r.twoTried += 1; if (v === 2) r.twoScored += 1; }
       // A one-point attempt: any shot that wasn't a two-point attempt and didn't end in a goal.
       else if (v !== 3) { r.oneTried += 1; if (v === 1) r.oneScored += 1; }
       if (placed) { r.frees += 1; if (v) r.freesScored += 1; }
@@ -391,7 +396,7 @@ export function combineSides(list) {
   const out = {
     games: list.length, total: 0, goals: 0, points: 0, shots: 0, scores: 0, possessions: 0, attacks: 0, wides: 0,
     turnoversWon: 0, turnoversLost: 0, fouls: 0,
-    shotsDetail: { singles: 0, twoTried: 0, twoScored: 0, goals: 0, wides: 0, savedBlocked: 0 },
+    shotsDetail: { singles: 0, twoTried: 0, twoScored: 0, twoScoredTracked: 0, twoTrackedGames: 0, goals: 0, wides: 0, savedBlocked: 0 },
     kickouts: { total: 0, wonClean: 0, wonBreak: 0, lostBreak: 0, lostClean: 0, unknown: 0, retained: 0 },
     koDist: {}, shotBoxes: {}, kickoutZones: {},
     quarters: QUARTERS.map((q) => ({ key: q, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
@@ -422,7 +427,7 @@ export function combineSides(list) {
       const k = pl.name.toLowerCase();
       const o = out.players[k];
       if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes } }; continue; }
-      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
+      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'twoTrackedGames', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
     }
     for (const r of s.sources || []) {
