@@ -141,3 +141,8 @@ tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
 .check.warn{color:#7a4a06}
 header{display:flex;justify-content:space-between;align-items:center}header a.nav{font:600 .9rem system-ui,sans-serif;color:#e6f2d0}
 .chart .end-label{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.team-chips{margin:4px 0 12px}
+.team-chips .chip{text-decoration:none;color:var(--dk);font-weight:600}
+.team-chips .chip.on{background:var(--dk);color:#fff}
+.season{position:relative;padding-top:26px}
+.season-label{position:absolute;top:8px;left:16px;font-weight:700}

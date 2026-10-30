@@ -6,9 +6,9 @@ export const dynamic = 'force-dynamic';
 const US = /roscommon/i;
 const total = (g, p) => 3 * (g ?? 0) + (p ?? 0);
 
-// Result from Roscommon's side; null when Roscommon didn't play.
-function fromOurSide(m) {
-  const t1 = US.test(m.team1.name), t2 = US.test(m.team2.name);
+// Result from one team's side (Roscommon unless another is chosen); null if they didn't play.
+function fromOurSide(m, side = US) {
+  const t1 = side.test(m.team1.name), t2 = side.test(m.team2.name);
   if (!t1 && !t2) return null;
   const us = t1 ? { g: m.team1_goals, p: m.team1_points } : { g: m.team2_goals, p: m.team2_points };
   const them = t1 ? { g: m.team2_goals, p: m.team2_points, name: m.team2.name } : { g: m.team1_goals, p: m.team1_points, name: m.team1.name };
@@ -18,6 +18,8 @@ function fromOurSide(m) {
 
 export default async function Home({ searchParams }) {
   const grade = searchParams.grade || '';
+  const who = ['opp', 'all'].includes(searchParams.who) ? searchParams.who : 'ros';
+  const team = who === 'opp' ? (searchParams.team || '') : '';
   let matches = [];
   let problem = null;
   try {
@@ -31,12 +33,24 @@ export default async function Home({ searchParams }) {
   const grades = [...new Set(matches.map((m) => m.competitions?.grade).filter(Boolean))];
   const years = [...new Set(matches.map((m) => m.competitions?.seasons?.year).filter(Boolean))].sort((a, b) => b - a);
   const year = Number(searchParams.year) || years[0] || null;
-  const shown = matches.filter(
+  const isRos = (m) => US.test(m.team1.name) || US.test(m.team2.name);
+  const inScope = matches.filter(
     (m) => (!grade || m.competitions?.grade === grade) && (!year || m.competitions?.seasons?.year === year)
   );
+  // Opposition teams: every team other than Roscommon in the games loaded.
+  const oppTeams = [...new Set(inScope.flatMap((m) => [m.team1.name, m.team2.name]))].filter((n) => !US.test(n)).sort();
+  const exact = (name) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  const teamRe = team ? exact(team) : null;
+  const shown = inScope.filter((m) =>
+    who === 'all' ? true
+      : who === 'ros' ? isRos(m)
+      : teamRe ? teamRe.test(m.team1.name) || teamRe.test(m.team2.name) // all their games, incl. v Roscommon
+      : !isRos(m)
+  );
 
-  // Season summary for Roscommon over the games shown.
-  const ours = shown.map(fromOurSide).filter(Boolean);
+  // Season summary from Roscommon's side, or from the chosen opposition team's side.
+  const side = who === 'opp' ? teamRe : US;
+  const ours = side ? shown.map((m) => fromOurSide(m, side)).filter(Boolean) : [];
   const sum = ours.reduce(
     (s, r) => ({
       P: s.P + 1,
@@ -62,6 +76,10 @@ export default async function Home({ searchParams }) {
     const p = new URLSearchParams();
     const gr = o.grade ?? grade;
     const yr = o.year ?? year;
+    const w = o.who ?? who;
+    const tm = o.team ?? (w === 'opp' ? team : '');
+    if (w !== 'ros') p.set('who', w);
+    if (tm) p.set('team', tm);
     if (gr) p.set('grade', gr);
     if (yr && yr !== years[0]) p.set('year', yr);
     const s = p.toString();
@@ -83,6 +101,11 @@ export default async function Home({ searchParams }) {
 
       <nav className="toolbar">
         <div className="seg">
+          <a href={link({ who: 'ros', team: '' })} className={who === 'ros' ? 'on' : ''}>Roscommon</a>
+          <a href={link({ who: 'opp', team: '' })} className={who === 'opp' ? 'on' : ''}>Opposition</a>
+          <a href={link({ who: 'all', team: '' })} className={who === 'all' ? 'on' : ''}>All</a>
+        </div>
+        <div className="seg">
           <a href={link({ grade: '' })} className={!grade ? 'on' : ''}>All grades</a>
           {grades.map((g) => <a key={g} href={link({ grade: g })} className={grade === g ? 'on' : ''}>{g}</a>)}
         </div>
@@ -93,8 +116,18 @@ export default async function Home({ searchParams }) {
         )}
       </nav>
 
+      {who === 'opp' && oppTeams.length > 0 && (
+        <div className="chips team-chips">
+          <a href={link({ team: '' })} className={`chip ${!team ? 'on' : ''}`}>All opposition</a>
+          {oppTeams.map((t) => (
+            <a key={t} href={link({ team: t })} className={`chip ${team.toLowerCase() === t.toLowerCase() ? 'on' : ''}`}>{t}</a>
+          ))}
+        </div>
+      )}
+
       {sum.P > 0 && (
         <div className="card season">
+          <div className="season-label muted small">{who === 'opp' ? team : 'Roscommon'}</div>
           <div><span className="muted small">Played</span><b>{sum.P}</b></div>
           <div><span className="muted small">Won</span><b>{sum.W}</b></div>
           <div><span className="muted small">Drawn</span><b>{sum.D}</b></div>
@@ -110,7 +143,7 @@ export default async function Home({ searchParams }) {
         <section key={g.key}>
           <h2>{g.name}{g.grade && g.grade !== 'Senior' ? <span className="muted"> · {g.grade}</span> : ''}</h2>
           {g.games.map((m) => {
-            const r = fromOurSide(m);
+            const r = side ? fromOurSide(m, side) : null;
             return (
               <a key={m.id} className="card game" href={`/match/${m.id}`}>
                 <span className={`badge ${r ? r.res : 'N'}`}>{r ? r.res : '–'}</span>
