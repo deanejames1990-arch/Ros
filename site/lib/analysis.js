@@ -80,7 +80,11 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
   const shotSource = new Map();
   for (const e of all) {
     if (e.event_type === 'Poss') lastPoss[e.team_id] = e;
-    else if (isShot(e)) shotSource.set(e, lbl(lastPoss[e.team_id], 'PossFrom') || 'Unknown');
+    else if (isShot(e)) {
+      // Prefer a source tagged on the shot itself; otherwise use the possession it came from.
+      const poss = lastPoss[e.team_id];
+      shotSource.set(e, lbl(e, 'Source') || (poss && lbl(poss, 'PossFrom')) || 'Not tagged');
+    }
   }
 
   const events = all.filter((e) => inPeriod(e, period));
@@ -95,6 +99,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     const turnoversLost = mine.filter((e) => e.event_type === 'Turnover');
     const turnoversWon = events.filter((e) => e.team_id === other(t.id) && e.event_type === 'Turnover');
     const fouls = mine.filter((e) => e.event_type === 'Foul');
+    const attacks = mine.filter((e) => e.event_type === 'Attack');
 
     // PSS by quarter
     const pss = QUARTERS.map((q) => {
@@ -171,6 +176,8 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       points: pointsTotal - 3 * goals, // points column of the scoreline (two-pointers count as 2)
       total: pointsTotal,
       possessions: poss.length,
+      attacks: attacks.length,
+      shotsPerAttack: attacks.length ? Math.round((100 * shots.length) / attacks.length) : null,
       shots: shots.length,
       scores: scored.length,
       conv: pct(scored.length, shots.length),
@@ -186,6 +193,9 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       shotsByOutcome: count(shots.map((s) => s.e), (e) => e.outcome),
       possFrom: count(poss, (e) => lbl(e, 'PossFrom')),
       turnoversLostByArea: count(turnoversLost, (e) => lbl(e, 'PitchArea')),
+      turnoversLostByType: count(turnoversLost, (e) => lbl(e, 'TurnoverType')),
+      goalChances: shots.filter((s) => lbl(s.e, 'GoalChance')).length,
+      kickoutSetups: count(kos.map((k) => k.e), (e) => lbl(e, 'Setup')),
       foulsByArea: count(fouls, (e) => lbl(e, 'PitchArea')),
       shooters,
     };
@@ -225,8 +235,14 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
   }
 
   const unknownTypes = [...new Set(all.map((e) => e.event_type))].filter(
-    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
+    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul', 'Attack', 'Throw In'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
   );
+  const has = (type) => all.some((e) => e.event_type === type);
+  const hasLabel = (k) => all.some((e) => lbl(e, k));
 
-  return { period, events, byTeam, flow, endMin, halfTime, elapsed, check, otherTypes: unknownTypes, total: all.length };
+  return {
+    period, events, byTeam, flow, endMin, halfTime, elapsed, check, otherTypes: unknownTypes, total: all.length,
+    has: { poss: has('Poss'), attack: has('Attack'), turnover: has('Turnover'), foul: has('Foul'), kickout: has('Kickout'),
+      area: hasLabel('PitchArea'), turnoverType: hasLabel('TurnoverType'), setup: hasLabel('Setup'), goalChance: hasLabel('GoalChance') },
+  };
 }

@@ -63,7 +63,7 @@ export default async function Match({ params, searchParams }) {
   };
 
   const hasEvents = events.length > 0;
-  const pss = (q) => `${q.poss}-${q.shots}-${q.scores}`;
+  const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
 
   return (
     <>
@@ -113,18 +113,20 @@ export default async function Match({ params, searchParams }) {
               b={B}
               rows={[
                 { label: 'Score', a: a.total, b: b.total, fmt: (v) => v },
-                { label: 'Possessions', a: a.possessions, b: b.possessions },
+                r.has.poss && { label: 'Possessions', a: a.possessions, b: b.possessions },
+                r.has.attack && { label: 'Attacks', a: a.attacks, b: b.attacks },
                 { label: 'Shots', a: a.shots, b: b.shots },
                 { label: 'Scores', a: a.scores, b: b.scores },
                 { label: 'Shot conversion', a: a.conv, b: b.conv, max: 100, fmt: pctTxt },
-                { label: 'Possessions → score', a: a.possToScore, b: b.possToScore, max: 100, fmt: pctTxt },
-                { label: 'Own kick-outs won', a: a.kickouts.retPct, b: b.kickouts.retPct, max: 100, fmt: pctTxt },
-                { label: 'Turnovers won', a: a.turnoversWon, b: b.turnoversWon },
+                r.has.poss && { label: 'Possessions → score', a: a.possToScore, b: b.possToScore, max: 100, fmt: pctTxt },
+                r.has.goalChance && { label: 'Goal chances', a: a.goalChances, b: b.goalChances },
+                r.has.kickout && { label: 'Own kick-outs won', a: a.kickouts.retPct, b: b.kickouts.retPct, max: 100, fmt: pctTxt },
+                r.has.turnover && { label: 'Turnovers won', a: a.turnoversWon, b: b.turnoversWon },
                 { label: 'Wides', a: a.wides, b: b.wides },
-                { label: 'Fouls conceded', a: a.fouls, b: b.fouls },
-              ]}
+                r.has.foul && { label: 'Fouls conceded', a: a.fouls, b: b.fouls },
+              ].filter(Boolean)}
             />
-            <p className="muted small">Score shown as total points (goal = 3). Possessions → score: share of possessions that ended in a score.</p>
+            <p className="muted small">Score shown as total points (goal = 3, two-pointer = 2).{r.has.poss ? ' Possessions → score: share of possessions that ended in a score.' : ''}</p>
           </div>
 
           {period === 'All' && (
@@ -136,7 +138,7 @@ export default async function Match({ params, searchParams }) {
             </>
           )}
 
-          <h2>Possessions – shots – scores</h2>
+          <h2>{r.has.poss ? 'Possessions – shots – scores' : 'Shots – scores'}</h2>
           <div className="wrap">
             <table className="nums">
               <thead>
@@ -152,15 +154,15 @@ export default async function Match({ params, searchParams }) {
                 ))}
                 <tr className="total">
                   <td>Total</td>
-                  <td>{a.possessions}-{a.shots}-{a.scores}</td><td>{a.total}</td>
-                  <td>{b.possessions}-{b.shots}-{b.scores}</td><td>{b.total}</td>
+                  <td>{pss({ poss: a.possessions, shots: a.shots, scores: a.scores })}</td><td>{a.total}</td>
+                  <td>{pss({ poss: b.possessions, shots: b.shots, scores: b.scores })}</td><td>{b.total}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <h2>Kick-outs</h2>
-          <div className="grid2">
+          {r.has.kickout && <h2>Kick-outs</h2>}
+          {r.has.kickout && <div className="grid2">
             {[A, B].map((t) => {
               const k = r.byTeam[t.id].kickouts;
               return (
@@ -168,6 +170,12 @@ export default async function Match({ params, searchParams }) {
                   <h3><i className="sw" style={{ background: t.color }} />{t.name} kick-outs</h3>
                   <p className="kpi"><b>{k.retained}/{k.total}</b> won · {pctTxt(k.retPct)}</p>
                   <KickoutBar k={k} color={t.color} />
+                  {view === 'analyst' && r.byTeam[t.id].kickoutSetups.some((x) => x.key !== '—') && (
+                    <table className="nums small-table">
+                      <thead><tr><th>Setup faced</th><th>No.</th></tr></thead>
+                      <tbody>{r.byTeam[t.id].kickoutSetups.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                    </table>
+                  )}
                   {k.byDist.length > 0 && (
                     <table className="nums small-table">
                       <thead><tr><th>Length</th><th>Won</th><th>%</th></tr></thead>
@@ -181,7 +189,7 @@ export default async function Match({ params, searchParams }) {
                 </div>
               );
             })}
-          </div>
+          </div>}
 
           <h2>Where the scores came from</h2>
           <div className="grid2">
@@ -192,7 +200,10 @@ export default async function Match({ params, searchParams }) {
               </div>
             ))}
           </div>
-          <p className="muted small">Each shot is credited to how that team won the ball for the possession it came from.</p>
+          <p className="muted small">
+            Each shot is credited to how that team won the ball for the possession it came from.
+            Where the source is only tagged on scores, misses show as “Not tagged”.
+          </p>
         </>
       )}
 
@@ -205,10 +216,12 @@ export default async function Match({ params, searchParams }) {
               return (
                 <div className="card" key={t.id}>
                   <h3><i className="sw" style={{ background: t.color }} />{t.name}</h3>
-                  <table className="nums small-table">
-                    <thead><tr><th>Pitch area</th><th>Shots</th><th>Scores</th><th>Pts</th></tr></thead>
-                    <tbody>{s.shotsByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.shots}</td><td>{x.scores}</td><td>{x.points}</td></tr>)}</tbody>
-                  </table>
+                  {s.shotsByArea.some((x) => x.key !== '—') && (
+                    <table className="nums small-table">
+                      <thead><tr><th>Pitch area</th><th>Shots</th><th>Scores</th><th>Pts</th></tr></thead>
+                      <tbody>{s.shotsByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.shots}</td><td>{x.scores}</td><td>{x.points}</td></tr>)}</tbody>
+                    </table>
+                  )}
                   <table className="nums small-table">
                     <thead><tr><th>Outcome</th><th>Shots</th></tr></thead>
                     <tbody>{s.shotsByOutcome.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
@@ -236,18 +249,33 @@ export default async function Match({ params, searchParams }) {
               return (
                 <div className="card" key={t.id}>
                   <h3><i className="sw" style={{ background: t.color }} />{t.name}</h3>
-                  <table className="nums small-table">
-                    <thead><tr><th>Possession won from</th><th>No.</th></tr></thead>
-                    <tbody>{s.possFrom.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
-                  </table>
-                  <table className="nums small-table">
-                    <thead><tr><th>Turnovers lost, by area</th><th>No.</th></tr></thead>
-                    <tbody>{s.turnoversLostByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
-                  </table>
-                  <table className="nums small-table">
-                    <thead><tr><th>Fouls conceded, by area</th><th>No.</th></tr></thead>
-                    <tbody>{s.foulsByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
-                  </table>
+                  {s.possFrom.some((x) => x.key !== '—') && (
+                    <table className="nums small-table">
+                      <thead><tr><th>Possession won from</th><th>No.</th></tr></thead>
+                      <tbody>{s.possFrom.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                    </table>
+                  )}
+                  {r.has.turnoverType && (
+                    <table className="nums small-table">
+                      <thead><tr><th>Turnovers lost, how</th><th>No.</th></tr></thead>
+                      <tbody>{s.turnoversLostByType.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                    </table>
+                  )}
+                  {r.has.area && (
+                    <>
+                      <table className="nums small-table">
+                        <thead><tr><th>Turnovers lost, by area</th><th>No.</th></tr></thead>
+                        <tbody>{s.turnoversLostByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                      </table>
+                      <table className="nums small-table">
+                        <thead><tr><th>Fouls conceded, by area</th><th>No.</th></tr></thead>
+                        <tbody>{s.foulsByArea.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                      </table>
+                    </>
+                  )}
+                  {!r.has.area && (
+                    <p className="muted small">Fouls conceded: {s.fouls} · Turnovers lost: {s.turnoversLost}</p>
+                  )}
                 </div>
               );
             })}

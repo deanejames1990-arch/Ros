@@ -104,3 +104,40 @@ tr.total td{font-weight:700;border-top:2px solid #cfd8d0}
   .scoreline .team:last-child{justify-content:flex-start}
   .scoreline .big{font-size:1.6rem}
 }
+
+/* ---------- Home ---------- */
+.hero{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.btn{display:inline-block;background:var(--lime);color:var(--dk);border-radius:10px;padding:10px 16px;font-weight:700;text-decoration:none}
+.season{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;text-align:center}
+.season div{display:flex;flex-direction:column}
+.season b{font:700 1.5rem Georgia,serif;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.season{grid-template-columns:repeat(3,1fr);row-gap:12px}}
+.game{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;margin:8px 0}
+.game-main{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.game-main .num{font-weight:700;font-variant-numeric:tabular-nums}
+.game-meta{text-align:right;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;font-weight:800;font-size:.85rem}
+.badge.W{background:#dcefe2;color:#1d6a3a}
+.badge.L{background:#f6dede;color:#9b2c2c}
+.badge.D{background:#ecefe9;color:#4f5b53}
+.badge.N{background:#ecefe9;color:#8a948d}
+@media (max-width:560px){.game{grid-template-columns:auto 1fr}.game-meta{grid-column:2;text-align:left}}
+
+/* ---------- Import ---------- */
+.import{display:grid;gap:12px}
+.import .card{margin:0}
+.drop{display:block;border:2px dashed #b9c8bc;border-radius:14px;padding:22px;text-align:center;background:#fff;cursor:pointer;font-weight:600}
+.drop input{display:block;margin:0 auto 8px;max-width:100%}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;margin-top:10px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut);font-weight:600}
+.fields input,.fields select{font:inherit;color:var(--dk);padding:9px 10px;border:1px solid #cfd8d0;border-radius:8px;background:#fff;flex:none}
+.fields .check-row{flex-direction:row;align-items:center;gap:8px}
+.scores{display:grid;gap:8px}
+.score-row{display:grid;grid-template-columns:minmax(8rem,1fr) 4.5rem auto 4.5rem auto;align-items:center;gap:8px}
+.score-row input{padding:8px;border:1px solid #cfd8d0;border-radius:8px;font:inherit;width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:#eef3ec;border-radius:999px;padding:4px 10px;font-size:.82rem}
+.import button:disabled{opacity:.5;cursor:default}
+.check.warn{color:#7a4a06}
+header{display:flex;justify-content:space-between;align-items:center}header a.nav{font:600 .9rem system-ui,sans-serif;color:#e6f2d0}
+.chart .end-label{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}

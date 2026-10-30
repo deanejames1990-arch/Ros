@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Server-side only: the secret key is never sent to visitors' browsers.
+// Next.js caches fetch() on the server by default; stats must always be live,
+// so every database request opts out of that cache.
 export const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false },
+  global: { fetch: (url, opts = {}) => fetch(url, { ...opts, cache: 'no-store' }) },
 });
 
 export const MATCH_SELECT =

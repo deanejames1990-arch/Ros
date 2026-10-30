@@ -36,12 +36,12 @@ export function Versus({ rows, a, b }) {
 export function ScoringFlow({ flow, endMin, halfTime, colors }) {
   const W = 640, H = 220, L = 34, R = 16, T = 12, B = 26;
   const maxPts = Math.max(5, ...flow.map((f) => f.points[f.points.length - 1].total));
-  const yMax = Math.ceil(maxPts / 5) * 5;
+  const yMax = Math.ceil((maxPts + 3) / 5) * 5; // headroom for the end labels
   const x = (m) => L + ((W - L - R) * Math.min(m, endMin)) / endMin;
   const y = (v) => T + (H - T - B) * (1 - v / yMax);
   const ticks = [];
   for (let v = 0; v <= yMax; v += yMax > 20 ? 10 : 5) ticks.push(v);
-  const mins = [0, 10, 20, 30, 40, 50, 60, 70].filter((m) => m <= endMin);
+  const mins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90].filter((m) => m <= endMin);
 
   // End-of-line labels: keep at least 14px apart so level scores don't overlap.
   const labelY = flow.map((f) => y(f.points[f.points.length - 1].total) - 6);
@@ -50,6 +50,7 @@ export function ScoringFlow({ flow, endMin, halfTime, colors }) {
     const prev = labelY[order[k - 1]], cur = order[k];
     if (labelY[cur] - prev < 14) labelY[cur] = prev + 14;
   }
+  for (let k = 0; k < labelY.length; k++) labelY[k] = Math.max(labelY[k], T + 10);
 
   return (
     <figure className="chart">
