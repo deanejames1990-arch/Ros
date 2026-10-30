@@ -10,7 +10,7 @@
 //                names are always our players; HIGH/MIDDLE/LOW is our end-to-end)
 // Anything else is kept in the event log with its original name.
 
-const MISS = ['WIDE', 'SHORT', 'BLOCK', 'BLOCKED', 'SAVE', 'SAVED', 'POST', 'OFF POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK', 'MISS'];
+const MISS = ['WIDE', 'SHORT', 'BLOCK', 'BLOCKED', 'SAVE', 'SAVED', 'POST', 'OFF POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK', 'SAVE_BLK_SHORT', 'MISS'];
 const SOURCES = {
   'FROM KO OWN': 'Own Kickout',
   'FROM KO OPP': 'Opp Kickout',
@@ -41,7 +41,7 @@ const KNOWN = new Set([
   'WON CLEAN', 'WON BREAK', 'LOST CLEAN', 'LOST BREAK', 'YELLOW', 'RED', 'BLACK',
   'TA CLEAN', 'TB CLEAN', 'TA BREAK', 'TB BREAK', 'TA SL', 'TB SL', 'TA FREE', 'TB FREE',
 ]);
-const SKIP_CATS = /^CLIP\b/;
+const SKIP_CATS = /(^|\s)CLIP\b/; // CLIP FOR ANALYSIS, SAVE CLIP, …
 const title = (s) =>
   s.toLowerCase()
     .replace(/(^|[\s(\-'’])([a-z])/g, (m, a, b) => a + b.toUpperCase())
@@ -51,6 +51,7 @@ const title = (s) =>
 const isName = (t) =>
   !KNOWN.has(t) && /^[A-ZÁÉÍÓÚ'’.\- ]+$/i.test(t) && /\s/.test(t.trim()) &&
   !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD|KICKOUT|PASS|POSS|ATT|SCORE|MISS|TURNOVER|WINBACK|UNFORCED|OPP|OUR|SCORABLE|UNSCORABLE|PHASE|PLACED|CHANCE|ATTEMPT|PSR|OPSR|TECHNICAL|THROW|THIRD)\b/i.test(t);
+const NOT_NAME = /^(SHOT|POINT|GOAL|WIDE|SHORT|SAVE|SAVED|BLOCK|BLOCKED|FREE|MARK|SCORE|MISS|POST|DISCIPLINE|BREACH|SIDELINE|TEAM|FOUL)$/;
 // The OUR/OPP template writes names as "J. CURRAN".
 const isInitialName = (t) => /^[A-Z]{1,2}\.\s?[A-Z][A-Z'’ -]+$/.test(t);
 
@@ -215,9 +216,28 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     if (template === 'OUR/OPP' && OUROPP_SKIP.test(cat)) continue;
     let t = tagsOf(m);
     const ouropp = template === 'OUR/OPP';
+    // Some analysts put shot detail in front of the name in the note:
+    // "2PT SHOT KOBE MCDONALD", "FROM 45' PAUL HONEYMAN".
+    let note = obs(m).replace(/\s+/g, ' ').trim();
+    const notePrefix = {};
+    for (;;) {
+      const pm = note.match(/^(2\s?PT(?:\s?SHOT)?|2\s?POINT(?:ER)?(?:\s?ATTEMPT)?|FROM 45'?|FROM FREE|FROM MARK|45'?|FREE|MARK)(?:\s+(.*))?$/);
+      if (!pm) break;
+      const k = pm[1];
+      if (/^2/.test(k)) notePrefix.two = true;
+      else if (/45/.test(k)) notePrefix.f45 = true;
+      else if (/MARK/.test(k)) notePrefix.mark = true;
+      else notePrefix.free = true;
+      note = (pm[2] || '').trim();
+    }
+    // "2 POINTER" means the same as "2 POINT".
+    t = t.map((x) => (x === '2 POINTER' || x === '2 POINTERS' ? '2 POINT' : x));
     let players = ouropp
       ? [...new Set(t.filter(isInitialName))].map(title)
-      : [...new Set([...t.filter(isName), ...(isName(obs(m)) ? [obs(m)] : [])])].map(title);
+      : [...new Set([...t.filter(isName), ...(isName(note) ? [note] : [])])].map(title);
+    // A lone surname on a shot ("MCDONALD") is kept and matched to a full name later.
+    if (!ouropp && !players.length && /^SHOT\b|\bSHOT$/.test(cat.replace(/^(TA|TB|HOME|AWAY)\s+/, ''))
+      && /^[A-Z'’-]{3,}$/.test(note) && !KNOWN.has(note) && !NOT_NAME.test(note)) players = [title(note)];
 
     let side = null, rest = cat, ooType = null, winback = false;
     const sm = cat.match(/^(TA|TB|HOME|AWAY)\s+(.*)$/);
@@ -273,6 +293,9 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     } else if (rest === 'ATTACK') {
       ev.event_type = 'Attack';
     } else if (/^SHOT\b|^45$/.test(rest)) {
+      if (notePrefix.f45) rest = '45';
+      else if (notePrefix.mark) rest = 'SHOT (M)';
+      else if (notePrefix.free && !/\(F\)/.test(rest)) t = [...t, 'FROM FREE'];
       const mark = /\(M\)/.test(rest);
       const placed = /\(F\)/.test(rest) || mark || rest === '45' || t.includes('FROM FREE');
       ev.event_type = rest === '45' ? 'Shot (45)' : mark ? 'Shot (Mark)' : placed ? 'Shot (F)' : 'Shot (P)';
@@ -280,8 +303,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       const scored = t.includes('GOAL') || t.includes('POINT') || t.includes('SCORE') || (t.includes('2 POINT') && !missTag);
       ev.outcome = scored
         ? t.includes('GOAL') ? 'Goal' : t.includes('2 POINT') ? '2 Point' : 'Point'
-        : missTag ? title(missTag.replace('SHORT_SAVE_BLOCK', 'Short/Save/Block')) : 'No score';
-      if (!scored && (t.includes('2 POINT') || t.includes('2 POINT ATTEMPT'))) ev.labels.Attempt = '2 Point';
+        : missTag ? title(missTag.replace(/^(SHORT_SAVE_BLOCK|SAVE_BLK_SHORT)$/, 'Short/Save/Block')) : 'No score';
+      if (!scored && (t.includes('2 POINT') || t.includes('2 POINT ATTEMPT') || notePrefix.two)) ev.labels.Attempt = '2 Point';
       if (t.includes('GOAL CHANCE')) ev.labels.GoalChance = 'Yes';
       let src = rest === '45' ? '45' : mark ? 'Mark' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
       // The HOME/AWAY template only marks frees, so everything else is open play.
@@ -309,8 +332,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
         else if (t.includes('LOST')) winner = other;
       }
       ev.outcome = winner ? `${names[winner]} ${how || 'Unspecified'}` : null;
-      const len = t.find((x) => /^(OPP )?(LONG|SHORT|MEDIUM)( KO| KICKOUT)?$/.test(x));
-      if (len) ev.labels.KickoutDistance = len.replace(/^OPP /, '')[0] + 'KO';
+      const len = t.find((x) => /^(OPP )?(KO )?(LONG|SHORT|MEDIUM)( KO| KICKOUT)?$/.test(x));
+      if (len) ev.labels.KickoutDistance = len.replace(/^(OPP )?(KO )?/, '')[0] + 'KO';
       const setup = t.find((x) => /^\d-\d/.test(x));
       if (setup) ev.labels.Setup = title(setup);
       if (!winner) warnings.push(`Kick-out at ${ev.minute}′ (${ev.half}) has no winner tagged.`);
@@ -343,6 +366,22 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     events.push(ev);
   }
 
+  // Lone surnames: if exactly one full name on the same side ends with it, use that.
+  for (const e of events) {
+    if (!e.player_no || /\s/.test(e.player_no) || !e.side) continue;
+    const full = [...new Set(events.filter((x) => x.side === e.side && x.player_no && /\s/.test(x.player_no)
+      && x.player_no.toLowerCase().endsWith(` ${e.player_no.toLowerCase()}`)).map((x) => x.player_no))];
+    if (full.length === 1) { e.player_no = full[0]; e.labels.Players = full[0]; }
+  }
+
+  // Full-time score written in a note, e.g. "FT: LEITRIM 1-12 MAYO 3-21".
+  let finalScore = null;
+  for (const m of meds) {
+    const o = String(m.Observacion || '').replace(/\s+/g, ' ').toUpperCase();
+    const fm = o.match(/\bFT:?\s*([A-Z][A-Z .'’-]*?)\s+(\d+)\s*-\s*(\d+)\s*,?\s*([A-Z][A-Z .'’-]*?)\s+(\d+)\s*-\s*(\d+)/);
+    if (fm) finalScore = [{ team: title(fm[1].trim()), g: +fm[2], p: +fm[3] }, { team: title(fm[4].trim()), g: +fm[5], p: +fm[6] }];
+  }
+
   // Tagged score per side, for the check against the official result.
   const tally = { A: { g: 0, p: 0 }, B: { g: 0, p: 0 } };
   for (const e of events) {
@@ -367,6 +406,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     counts,
     warnings,
     video: video.Nombre_Archivo || '',
+    finalScore,
     guess: guessFromName(fileName, video.Nombre_Archivo || ''),
   };
 }

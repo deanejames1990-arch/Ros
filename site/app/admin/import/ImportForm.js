@@ -82,7 +82,15 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
         newGrade: g.grade || 'Senior',
         newYear: year,
         newShowNames: true,
-        g1: s1.g, p1: s1.p, g2: s2.g, p2: s2.p,
+        ...(() => {
+          // Use a full-time score written in the file ("FT: LEITRIM 1-12 MAYO 3-21") when it names both teams.
+          const fs = first.finalScore;
+          const same = (x, y) => (x || '').toLowerCase() === (y || '').toLowerCase();
+          const f1 = fs?.find((x) => same(x.team, team1)), f2 = fs?.find((x) => same(x.team, team2));
+          return f1 && f2
+            ? { g1: f1.g, p1: f1.p, g2: f2.g, p2: f2.p, scoreFrom: 'note' }
+            : { g1: s1.g, p1: s1.p, g2: s2.g, p2: s2.p, scoreFrom: 'tags' };
+        })(),
       });
       setSrc({ json, fileName: file.name });
     } catch (e) {
@@ -205,7 +213,11 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
 
           <div className="card">
             <h3>Final score</h3>
-            <p className="muted small">Pre-filled from the tags. Correct it to the official result if it differs — the dashboard will flag the gap.</p>
+            <p className="muted small">
+              {f.scoreFrom === 'note'
+                ? 'Pre-filled from the full-time score written in the file.'
+                : 'Pre-filled from the tags. Correct it to the official result if it differs — the dashboard will flag the gap.'}
+            </p>
             <div className="scores">
               {[['1', f.team1, tagged.t1], ['2', f.team2, tagged.t2]].map(([n, name, t]) => (
                 <div key={n} className="score-row">
