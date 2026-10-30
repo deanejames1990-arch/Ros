@@ -243,3 +243,55 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
     </div>
   );
 }
+
+// League v Championship side by side, per game, for one team.
+export function CompareTypes({ name, rows, href }) {
+  const [L, C] = rows;
+  const per = (v, n) => (n ? v / n : null);
+  const f1 = (v) => (v == null ? '—' : v.toFixed(1));
+  const pc = (v) => (v == null ? '—' : `${Math.round(v)}%`);
+  const lines = [
+    ['Games', (r) => `${r.games}${r.taggedGames < r.games ? ` (${r.taggedGames} tagged)` : ''}`],
+    ['Won – drawn – lost', (r) => `${r.W}–${r.D}–${r.L}`],
+    ['Points for per game', (r) => f1(per(r.ptsFor, r.games)), 'hi'],
+    ['Points against per game', (r) => f1(per(r.ptsAgainst, r.games)), 'lo'],
+    ['Shots per game', (r) => f1(per(r.us.shots, r.us.games)), 'hi'],
+    ['Shot conversion', (r) => pc(r.us.conv), 'hi'],
+    ['Points per shot', (r) => (r.us.ptsPerShot == null ? '—' : r.us.ptsPerShot.toFixed(2)), 'hi'],
+    ['2-pointers scored / tried per game', (r) => (r.us.games ? `${f1(r.us.shotsDetail.twoScored / r.us.games)} / ${f1(r.us.shotsDetail.twoTried / r.us.games)}` : '—')],
+    ['Own kick-outs retained', (r) => pc(r.us.kickouts.retPct), 'hi'],
+    ['Opposition kick-outs won', (r) => pc(r.them.kickouts.total - r.them.kickouts.unknown ? 100 - r.them.kickouts.retPct : null), 'hi'],
+    ['Turnovers won per game', (r) => f1(per(r.us.turnoversWon, r.us.games)), 'hi'],
+    ['Turnovers lost per game', (r) => f1(per(r.us.turnoversLost, r.us.games)), 'lo'],
+    ['Opposition shots per game', (r) => f1(per(r.them.shots, r.them.games)), 'lo'],
+  ];
+  const num = (t) => parseFloat(String(t).replace('%', ''));
+  return (
+    <>
+      <h2>League v Championship</h2>
+      <div className="card">
+        <div className="wrap">
+          <table className="nums compare">
+            <thead><tr><th>{name}, per game</th><th><a href={href('League')}>League</a></th><th><a href={href('Championship')}>Championship</a></th></tr></thead>
+            <tbody>
+              {lines.map(([label, fn, better]) => {
+                const a = fn(L), c = fn(C);
+                const x = num(a), y = num(c);
+                const win = better && Number.isFinite(x) && Number.isFinite(y) && x !== y
+                  ? ((better === 'hi') === (x > y) ? 'a' : 'c') : null;
+                return (
+                  <tr key={label}>
+                    <td>{label}</td>
+                    <td className={win === 'a' ? 'better' : ''}>{a}</td>
+                    <td className={win === 'c' ? 'better' : ''}>{c}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="muted small">Per-game figures from the tagged games in each; results and points use every game. Bold marks the better of the two. Click League or Championship to see that report on its own.</p>
+      </div>
+    </>
+  );
+}

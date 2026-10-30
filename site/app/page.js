@@ -1,4 +1,5 @@
 import { db, MATCH_SELECT } from '../lib/db';
+import { compType } from '../lib/analysis';
 import { score } from './components';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export default async function Home({ searchParams }) {
   const grade = searchParams.grade || '';
   const who = ['opp', 'all'].includes(searchParams.who) ? searchParams.who : 'ros';
   const team = who === 'opp' ? (searchParams.team || '') : '';
+  const comp = ['League', 'Championship'].find((x) => x.toLowerCase() === String(searchParams.comp || '').toLowerCase()) || '';
   let matches = [];
   let problem = null;
   try {
@@ -36,6 +38,7 @@ export default async function Home({ searchParams }) {
   const isRos = (m) => US.test(m.team1.name) || US.test(m.team2.name);
   const inScope = matches.filter(
     (m) => (!grade || m.competitions?.grade === grade) && (!year || m.competitions?.seasons?.year === year)
+      && (!comp || compType(m.competitions?.name) === comp)
   );
   // Opposition teams: every team other than Roscommon in the games loaded.
   const oppTeams = [...new Set(inScope.flatMap((m) => [m.team1.name, m.team2.name]))].filter((n) => !US.test(n)).sort();
@@ -78,6 +81,8 @@ export default async function Home({ searchParams }) {
     const yr = o.year ?? year;
     const w = o.who ?? who;
     const tm = o.team ?? (w === 'opp' ? team : '');
+    const cp = o.comp ?? comp;
+    if (cp) p.set('comp', cp.toLowerCase());
     if (w !== 'ros') p.set('who', w);
     if (tm) p.set('team', tm);
     if (gr) p.set('grade', gr);
@@ -106,6 +111,11 @@ export default async function Home({ searchParams }) {
           <a href={link({ grade: '' })} className={!grade ? 'on' : ''}>All grades</a>
           {grades.map((g) => <a key={g} href={link({ grade: g })} className={grade === g ? 'on' : ''}>{g}</a>)}
         </div>
+        <div className="seg">
+          <a href={link({ comp: '' })} className={!comp ? 'on' : ''}>League &amp; Champ</a>
+          <a href={link({ comp: 'League' })} className={comp === 'League' ? 'on' : ''}>League</a>
+          <a href={link({ comp: 'Championship' })} className={comp === 'Championship' ? 'on' : ''}>Championship</a>
+        </div>
         {years.length > 0 && (
           <div className="seg">
             {years.map((y) => <a key={y} href={link({ year: y })} className={year === y ? 'on' : ''}>{y}</a>)}
@@ -124,7 +134,7 @@ export default async function Home({ searchParams }) {
 
       {(who === 'ros' || team) && (
         <p className="report-link">
-          <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}) })}`}>
+          <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}), ...(comp ? { comp: comp.toLowerCase() } : {}) })}`}>
             Open the {who === 'ros' ? 'Roscommon' : team} report: kick-outs, shooting, quarters, turnovers, players →
           </a>
         </p>

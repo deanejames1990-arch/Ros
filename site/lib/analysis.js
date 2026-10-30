@@ -439,3 +439,8 @@ export function combineSides(list) {
   out.sources = Object.values(out.sources).map((r) => ({ ...r, conv: pct(r.scores, r.shots) })).sort((a, b) => b.points - a.points);
   return out;
 }
+
+// League or championship, from the competition name (NFL, FBD, O'Byrne/McKenna Cup,
+// "Division 1"… are league-type; everything else is championship).
+export const compType = (name = '') =>
+  /league|\bnfl\b|\bfbd\b|o'?\s?byrne|mckenna|\bdiv(ision)?\.?\s?\d|\bd\d\b/i.test(name) ? 'League' : 'Championship';

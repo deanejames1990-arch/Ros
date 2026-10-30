@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
-import { analyseMatch, combineSides, withoutNames } from '../../../lib/analysis';
+import { analyseMatch, combineSides, withoutNames, compType } from '../../../lib/analysis';
+import { CompareTypes } from '../../report/sections';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
@@ -30,12 +31,15 @@ export default async function TeamReport({ params, searchParams }) {
     .map((m) => m.competitions?.seasons?.year).filter(Boolean))].sort((x, y) => y - x);
   // Open on the latest season; ?year=all combines every season.
   const year = searchParams.year === 'all' ? null : Number(searchParams.year) || years[0] || null;
-  const games = (all || []).filter(
+  const inSeason = (all || []).filter(
     (m) => (!grade || m.competitions?.grade === grade) && (!year || m.competitions?.seasons?.year === year)
   );
+  // League / Championship (from the competition name); both when not chosen.
+  const types = [...new Set(inSeason.map((m) => compType(m.competitions?.name)))].sort();
+  const comp = ['League', 'Championship'].find((x) => x.toLowerCase() === String(searchParams.comp || '').toLowerCase()) || '';
 
   // Analyse every tagged game and keep this team's side and the opposition's side.
-  const done = await Promise.all(games.map(async (m) => {
+  const analysed = await Promise.all(inSeason.map(async (m) => {
     const raw = await loadEvents(m.id);
     const events = m.competitions?.show_player_names === false ? withoutNames(raw) : raw;
     if (!events.length) return { m, tagged: false };
@@ -45,6 +49,8 @@ export default async function TeamReport({ params, searchParams }) {
     const oppId = mineId === m.team1_id ? m.team2_id : m.team1_id;
     return { m, tagged: true, mine: r.byTeam[mineId], opp: r.byTeam[oppId], oppName: t.find((x) => x.id === oppId).name };
   }));
+  const done = analysed.filter((d) => !comp || compType(d.m.competitions?.name) === comp);
+  const games = done.map((d) => d.m);
   const tagged = done.filter((d) => d.tagged);
   const a = combineSides(tagged.map((d) => d.mine));
   const b = combineSides(tagged.map((d) => d.opp));
@@ -66,8 +72,10 @@ export default async function TeamReport({ params, searchParams }) {
     const gr = o.grade ?? (grade || 'all');
     // Changing grade goes back to that grade's latest season.
     const yr = o.year ?? (o.grade !== undefined ? null : year || 'all');
+    const cp = o.comp ?? comp;
     if (gr && gr !== grades[0]) p.set('grade', gr);
     if (yr) p.set('year', yr);
+    if (cp) p.set('comp', cp.toLowerCase());
     const s = p.toString();
     return `/team/${encodeURIComponent(teamName)}${s ? `?${s}` : ''}`;
   };
@@ -75,8 +83,8 @@ export default async function TeamReport({ params, searchParams }) {
   return (
     <>
       <p className="muted"><a href="/">All games</a></p>
-      <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
-        <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}</h1>
+      <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'}${comp ? ` ${comp}` : ''} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
+        <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}{comp ? <span className="muted"> · {comp}</span> : ''}</h1>
         <PrintButton />
       </div>
       <SectionImages />
@@ -93,11 +101,42 @@ export default async function TeamReport({ params, searchParams }) {
             <a href={link({ year: 'all' })} className={!year ? 'on' : ''}>All seasons</a>
           </div>
         )}
+        {types.length > 1 && (
+          <div className="seg">
+            <a href={link({ comp: '' })} className={!comp ? 'on' : ''}>League &amp; Champ</a>
+            <a href={link({ comp: 'League' })} className={comp === 'League' ? 'on' : ''}>League</a>
+            <a href={link({ comp: 'Championship' })} className={comp === 'Championship' ? 'on' : ''}>Championship</a>
+          </div>
+        )}
       </nav>
       <p className="muted">
         {tagged.length} tagged game{tagged.length === 1 ? '' : 's'} combined
         {games.length > tagged.length && ` · ${games.length - tagged.length} more without tags`}. Numbers are totals across the games; rates are worked out from the totals.
       </p>
+
+      {!comp && types.length > 1 && (
+        <CompareTypes
+          name={teamName}
+          rows={['League', 'Championship'].map((ty) => {
+            const ds = analysed.filter((d) => compType(d.m.competitions?.name) === ty);
+            const tg = ds.filter((d) => d.tagged);
+            const rs = ds.map((d) => result(d.m).res);
+            const pts = ds.map((d) => {
+              const us = ids.includes(d.m.team1_id);
+              const f = us ? 3 * d.m.team1_goals + d.m.team1_points : 3 * d.m.team2_goals + d.m.team2_points;
+              const g = us ? 3 * d.m.team2_goals + d.m.team2_points : 3 * d.m.team1_goals + d.m.team1_points;
+              return [f, g];
+            });
+            return {
+              type: ty, games: ds.length, taggedGames: tg.length,
+              W: rs.filter((x) => x === 'W').length, D: rs.filter((x) => x === 'D').length, L: rs.filter((x) => x === 'L').length,
+              ptsFor: pts.reduce((n, x) => n + x[0], 0), ptsAgainst: pts.reduce((n, x) => n + x[1], 0),
+              us: combineSides(tg.map((d) => d.mine)), them: combineSides(tg.map((d) => d.opp)),
+            };
+          })}
+          href={(ty) => link({ comp: ty })}
+        />
+      )}
 
       <div className="game-strip">
         {done.map(({ m, tagged: t }) => {
@@ -106,7 +145,7 @@ export default async function TeamReport({ params, searchParams }) {
             <a key={m.id} href={`/match/${m.id}`} className={`card game ${t ? '' : 'untagged'}`}>
               <span className={`badge ${r.res}`}>{r.res}</span>
               <span className="game-main"><b>v {r.opp}</b><span className="num">{r.line}</span></span>
-              <span className="muted small game-meta">{!grade && m.competitions?.grade ? `${m.competitions.grade} · ` : ''}{!year && m.competitions?.seasons?.year ? `${m.competitions.seasons.year} · ` : ''}{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}</span>
+              <span className="muted small game-meta">{!grade && m.competitions?.grade ? `${m.competitions.grade} · ` : ''}{!year && m.competitions?.seasons?.year ? `${m.competitions.seasons.year} · ` : ''}{!comp && types.length > 1 ? `${compType(m.competitions?.name)} · ` : ''}{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}</span>
             </a>
           );
         })}
