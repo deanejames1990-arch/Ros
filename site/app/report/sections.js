@@ -167,3 +167,65 @@ export function TurnoverSection({ A, B, a }) {
     </>
   );
 }
+
+// Player table from the names on the tags. Columns with nothing in them are hidden.
+const COLS = [
+  { k: 'games', label: 'Games', only: 'multi' },
+  { k: 'points', label: 'Pts' },
+  { k: 'shots', label: 'Shots' },
+  { k: 'scores', label: 'Scores' },
+  { k: 'conv', label: 'Conv', fmt: (p) => (p.shots ? `${Math.round((100 * p.scores) / p.shots)}%` : '—'), need: 'shots' },
+  { k: 'goals', label: 'Goals' },
+  { k: 'twoTried', label: '2-pt', fmt: (p) => (p.twoTried ? `${p.twoScored}/${p.twoTried}` : '—') },
+  { k: 'frees', label: 'Frees', fmt: (p) => (p.frees ? `${p.freesScored}/${p.frees}` : '—') },
+  { k: 'wides', label: 'Wides' },
+  { k: 'poss', label: 'Poss' },
+  { k: 'attacks', label: 'Attacks' },
+  { k: 'koWon', label: 'KOs won' },
+  { k: 'freesWon', label: 'Frees won' },
+  { k: 'turnoversLost', label: 'T/O lost' },
+];
+
+export function PlayerTable({ T, s, multi = false, limit = 12 }) {
+  const list = s.players || [];
+  const tagged = list.reduce((n, p) => n + p.points, 0);
+  if (!list.length) {
+    return (
+      <div className="card">
+        <h3><i className="sw" style={{ background: T.color }} />{T.name}</h3>
+        <p className="muted small">No player names are tagged for {T.name} in {multi ? 'these games' : 'this game'}.</p>
+      </div>
+    );
+  }
+  const cols = COLS.filter((c) => (c.only !== 'multi' || multi) && list.some((p) => p[c.need || c.k]));
+  const id = `more-${T.name.replace(/\W+/g, '-')}`;
+  return (
+    <div className="card player-card">
+      <h3><i className="sw" style={{ background: T.color }} />{T.name} players</h3>
+      {list.length > limit && <input type="checkbox" id={id} className="more-toggle" />}
+      <div className="wrap">
+        <table className="nums players">
+          <thead><tr><th>Player</th>{cols.map((c) => <th key={c.k}>{c.label}</th>)}</tr></thead>
+          <tbody>
+            {list.map((p, i) => (
+              <tr key={p.name} className={i >= limit ? 'extra' : undefined}>
+                <td>{p.name}</td>
+                {cols.map((c) => <td key={c.k}>{c.fmt ? c.fmt(p) : p[c.k] || '—'}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {list.length > limit && (
+        <label htmlFor={id} className="more-label">
+          <span className="show">Show all {list.length} players</span><span className="hide">Show fewer</span>
+        </label>
+      )}
+      <p className="muted small">
+        From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal.
+        {s.total > tagged && ` ${s.total - tagged} of ${T.name}’s ${s.total} points have no shooter tagged.`}
+        {' '}Spelling differences in the tags show as separate players for now.
+      </p>
+    </div>
+  );
+}

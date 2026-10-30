@@ -181,3 +181,19 @@ header{display:flex;justify-content:space-between;align-items:center}header a.na
 
 .seg a.on{background:var(--g)}
 h1,h2{color:var(--dk)}
+.players th,.players td{padding:6px 8px;font-size:.88rem;white-space:nowrap}
+.players td:first-child{font-weight:600}
+.more{margin-top:6px}
+.more summary{cursor:pointer;color:var(--g);font-weight:600;font-size:.88rem;padding:4px 0}
+.players-stack{display:grid;gap:12px}
+.players-stack .card{margin:0}
+.players-stack{grid-template-columns:minmax(0,1fr)}
+.player-card,.card{min-width:0}
+.more-toggle{position:absolute;opacity:0;pointer-events:none}
+.players tr.extra{display:none}
+.more-toggle:checked ~ .wrap .players tr.extra{display:table-row}
+.more-label{display:inline-block;margin-top:6px;color:var(--g);font-weight:600;font-size:.88rem;cursor:pointer}
+.more-label .hide{display:none}
+.more-toggle:checked ~ .more-label .show{display:none}
+.more-toggle:checked ~ .more-label .hide{display:inline}
+.more-toggle:focus-visible ~ .more-label{outline:2px solid var(--g);outline-offset:2px}

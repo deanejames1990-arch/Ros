@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, combineSides } from '../../../lib/analysis';
 import { score } from '../../components';
-import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection } from '../../report/sections';
+import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +98,8 @@ export default async function TeamReport({ params, searchParams }) {
           <ShootingSection A={A} B={B} a={a} b={b} />
           <PeriodSection A={A} B={B} a={a} b={b} />
           <TurnoverSection A={A} B={B} a={a} />
+          <h2>{teamName} players</h2>
+          <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} />
         </>
       )}
     </>

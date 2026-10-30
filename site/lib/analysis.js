@@ -270,6 +270,54 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     };
   }
 
+  // ---- Players, from the names on the tags ------------------------------
+  // A name belongs to the team it acted for: the shooting / possessing team,
+  // the team that won a kick-out, the team that won a free.
+  const playerRows = Object.fromEntries(teams.map((t) => [t.id, {}]));
+  const prow = (tid, name) => {
+    if (!tid || !playerRows[tid] || !name) return null;
+    const key = name.trim();
+    return (playerRows[tid][key.toLowerCase()] ||= {
+      name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0,
+      frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0, boxes: {},
+    });
+  };
+  const namesOf = (e) => {
+    const list = String(lbl(e, 'Players') || '').split(',').map((x) => x.trim()).filter(Boolean);
+    return list.length ? list : e.player_no ? [String(e.player_no)] : [];
+  };
+  for (const e of events) {
+    const names = namesOf(e);
+    if (!names.length) continue;
+    if (isShot(e)) {
+      const r = prow(e.team_id, e.player_no || names[0]);
+      if (!r) continue;
+      const v = shotValue(e);
+      const placed = /\((F|45)\)/.test(e.event_type || '');
+      const two = v === 2 || lbl(e, 'Attempt') === '2 Point';
+      r.shots += 1; r.points += v;
+      if (v) r.scores += 1;
+      if (v === 3) r.goals += 1;
+      if (two) { r.twoTried += 1; if (v === 2) r.twoScored += 1; }
+      if (placed) { r.frees += 1; if (v) r.freesScored += 1; }
+      if (!v && /wide/i.test(e.outcome || '')) r.wides += 1;
+      const z = zoneOf(e);
+      if (z != null) r.boxes[z] = (r.boxes[z] || 0) + 1;
+    } else if (e.event_type === 'Poss' || e.event_type === 'Attack') {
+      for (const n of names) { const r = prow(e.team_id, n); if (r) r[e.event_type === 'Poss' ? 'poss' : 'attacks'] += 1; }
+    } else if (e.event_type === 'Kickout') {
+      const w = winnerOf(e.outcome, teams);
+      if (w) for (const n of names) { const r = prow(w.id, n); if (r) r.koWon += 1; }
+    } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy')) {
+      for (const n of names) { const r = prow(other(e.team_id), n); if (r) r.freesWon += 1; }
+    } else if (e.event_type === 'Turnover') {
+      for (const n of names) { const r = prow(e.team_id, n); if (r) r.turnoversLost += 1; }
+    } else if (e.event_type === 'Card') {
+      for (const n of names) { const r = prow(e.team_id, n); if (r) r.cards += 1; }
+    }
+  }
+  for (const t of teams) byTeam[t.id].players = sortPlayers(Object.values(playerRows[t.id]));
+
   // Scoring flow: cumulative points for each team through the game (full game only).
   const flow = teams.map((t) => {
     let run = 0;
@@ -316,6 +364,9 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
   };
 }
 
+export const sortPlayers = (list) =>
+  list.sort((a, b) => b.points - a.points || b.shots - a.shots || b.poss - a.poss || b.koWon - a.koWon || a.name.localeCompare(b.name));
+
 // ---- Combining games ------------------------------------------------------
 // Sums one side's numbers across several games (a team page: "Armagh, 5 games")
 // and recomputes the rates. Each item is a byTeam entry from analyseMatch.
@@ -331,6 +382,7 @@ export function combineSides(list) {
     halves: ['H1', 'H2'].map((h) => ({ key: h, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
     thirds: { conceded: { Def: 0, Mid: 0, Att: 0, none: 0 }, wonBack: { Def: 0, Mid: 0, Att: 0, none: 0 } },
     sources: {},
+    players: {},
   };
   for (const s of list) {
     for (const k of ['total', 'goals', 'points', 'shots', 'scores', 'possessions', 'attacks', 'wides', 'turnoversWon', 'turnoversLost', 'fouls']) out[k] += s[k] || 0;
@@ -350,6 +402,13 @@ export function combineSides(list) {
       (s[key] || []).forEach((r, i) => { for (const f of ['points', 'shots', 'koWon', 'koTotal']) out[key][i][f] = add(out[key][i][f], r[f]); });
     }
     for (const side of ['conceded', 'wonBack']) for (const k in out.thirds[side]) out.thirds[side][k] += s.thirds?.[side]?.[k] || 0;
+    for (const pl of s.players || []) {
+      const k = pl.name.toLowerCase();
+      const o = out.players[k];
+      if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes } }; continue; }
+      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards']) o[f] += pl[f];
+      for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
+    }
     for (const r of s.sources || []) {
       const o = (out.sources[r.source] ||= { source: r.source, shots: 0, scores: 0, points: 0 });
       o.shots += r.shots; o.scores += r.scores; o.points += r.points;
@@ -360,6 +419,7 @@ export function combineSides(list) {
   const k = out.kickouts;
   k.retPct = pct(k.retained, k.total - k.unknown);
   k.byDist = Object.values(out.koDist).sort((a, b) => a.dist.localeCompare(b.dist)).map((d) => ({ ...d, pct: pct(d.won, d.total) }));
+  out.players = sortPlayers(Object.values(out.players));
   out.sources = Object.values(out.sources).map((r) => ({ ...r, conv: pct(r.scores, r.shots) })).sort((a, b) => b.points - a.points);
   return out;
 }

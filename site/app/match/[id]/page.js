@@ -3,7 +3,7 @@ import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf } from '../../../lib/analysis';
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
-import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection } from '../../report/sections';
+import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,6 +168,12 @@ export default async function Match({ params, searchParams }) {
 
           <TurnoverSection A={A} B={B} a={a} />
 
+          <h2>Players</h2>
+          <div className="players-stack">
+            <PlayerTable T={A} s={a} />
+            <PlayerTable T={B} s={b} />
+          </div>
+
           <h2>Where the scores came from</h2>
           <div className="grid2">
             {[A, B].map((t) => (
@@ -203,17 +209,7 @@ export default async function Match({ params, searchParams }) {
                     <thead><tr><th>Outcome</th><th>Shots</th></tr></thead>
                     <tbody>{s.shotsByOutcome.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
                   </table>
-                  <table className="nums small-table">
-                    <thead><tr><th>Shooter</th><th>Shots</th><th>Scores</th><th>Pts</th><th>Wides</th></tr></thead>
-                    <tbody>
-                      {s.shooters.map((x) => (
-                        <tr key={x.key}>
-                          <td>{x.key}{nameFor(t.id, x.key) ? ` · ${nameFor(t.id, x.key)}` : ''}</td>
-                          <td>{x.shots}</td><td>{x.scores}</td><td>{x.points}</td><td>{x.wides}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
                 </div>
               );
             })}
