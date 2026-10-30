@@ -88,10 +88,7 @@ export default async function Home({ searchParams }) {
 
   return (
     <>
-      <div className="hero">
-        <h1>Games</h1>
-        <a className="btn" href="/admin/import">+ Add a game</a>
-      </div>
+      <h1>Games</h1>
 
       {problem && (
         <div className="card check warn">
