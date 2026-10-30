@@ -202,3 +202,29 @@ h1,h2{color:var(--dk)}
 .log-details summary h2{display:inline-block}
 .log-details summary h2::before{content:"▸ ";color:var(--g)}
 .log-details[open] summary h2::before{content:"▾ "}
+
+/* ---------- Login / admin ---------- */
+.nav-links{display:flex;gap:18px;align-items:center}
+.login{max-width:380px;margin:40px auto;text-align:center}
+.login-crest{height:72px;margin:6px auto 4px;display:block}
+.login-form{display:grid;gap:12px;text-align:left;margin-top:10px}
+.login-form label{display:grid;gap:4px;font-size:.85rem;color:var(--mut);font-weight:600}
+.login-form input[type=password]{font:inherit;color:var(--dk);padding:11px 12px;border:1px solid #cbd3e3;border-radius:10px}
+.admin-form{display:grid;gap:10px}
+.admin-form h3{margin:0}
+.admin-form .score-row input:first-child{padding:8px;border:1px solid #cbd3e3;border-radius:8px;font:inherit}
+button.danger{background:#9b2c2c;color:#fff}
+.danger-zone{border-color:#e7b9b9;margin-top:18px}
+.danger-zone input{margin-left:8px;padding:6px 8px;border:1px solid #cbd3e3;border-radius:8px;font:inherit;width:8rem}
+.search{display:flex;gap:8px;margin:6px 0 10px}
+.search input{flex:1}
+.admin-table td,.admin-table th{white-space:nowrap}
+.admin-table td:nth-child(4){white-space:normal}
+.admin-comps{display:grid;gap:8px}
+.admin-comps .card{margin:0}
+.comp-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.comp-row input[name=name]{flex:1;min-width:220px;padding:8px 10px;border:1px solid #cbd3e3;border-radius:8px;font:inherit}
+.comp-row select{padding:8px;border:1px solid #cbd3e3;border-radius:8px;font:inherit;background:#fff;max-width:100%}
+.merge{margin-top:8px}
+.merge summary{cursor:pointer;color:var(--g)}
+.merge .comp-row{margin-top:8px}

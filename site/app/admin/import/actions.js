@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '../../../lib/db';
+import { requireAdmin } from '../../../lib/session';
 
 const clean = (s) => String(s || '').trim();
 
@@ -47,6 +48,7 @@ async function findOrCreateCompetition(c, matchYear) {
 // replaces that game's events rather than creating a duplicate.
 export async function importGame(p) {
   try {
+    await requireAdmin();
     if (!p?.events?.length) throw new Error('No events to save.');
     if (!p.date) throw new Error('Please enter the match date.');
     const [t1, t2] = await Promise.all([findOrCreateTeam(p.team1), findOrCreateTeam(p.team2)]);

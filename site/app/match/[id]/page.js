@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
+import { currentRole } from '../../../lib/session';
 import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
@@ -14,6 +15,7 @@ export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();
   if (!m) notFound();
   const showNames = m.competitions.show_player_names;
+  const role = await currentRole();
   const view = searchParams.view === 'analyst' ? 'analyst' : 'coach';
   const period = PERIODS.includes(searchParams.period) ? searchParams.period : 'All';
 
@@ -57,6 +59,7 @@ export default async function Match({ params, searchParams }) {
   return (
     <>
       <p className="muted">
+        {role === 'admin' && <><a href={`/admin/game/${m.id}`}>Edit game</a> · </>}
         <a href="/">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
       </p>
       <div className="scoreline">
