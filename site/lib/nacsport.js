@@ -16,7 +16,11 @@ const SOURCES = {
   'FROM SHOT': 'Rebound',
   'FROM FREE': 'Free',
 };
-const AREAS = { 'INSIDE 45': 'Inside 45', 'MID 45': 'Mid 45', 'DEF 45': 'Def 45' };
+const AREAS = {
+  'INSIDE 45': 'Inside 45', 'MID 45': 'Mid 45', 'DEF 45': 'Def 45',
+  'OWN THIRD': 'Own Third', 'DEFENSIVE THIRD': 'Own Third', 'MIDDLE THIRD': 'Middle Third',
+  'ATTACKING THIRD': 'Attacking Third', 'OPP THIRD': 'Attacking Third',
+};
 const TURNOVER_TYPES = {
   'LOST BALL IN TACKLE': 'Lost in tackle',
   'KICKPASS -': 'Kick pass',
@@ -178,6 +182,9 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     if (players.length) ev.labels.Players = players.join(', ');
     const area = t.find((x) => AREAS[x]);
     if (area) ev.labels.PitchArea = AREAS[area];
+    // Hub box number (BOX 0-15): where a kick-out landed or a shot was taken.
+    const boxTag = t.find((x) => /^BOX \d+$/.test(x));
+    if (boxTag) ev.labels.Zone = title(boxTag);
 
     if (rest === 'POSS') {
       ev.event_type = 'Poss';
@@ -215,8 +222,6 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       if (len) ev.labels.KickoutDistance = len[0] + 'KO';
       const setup = t.find((x) => /^\d-\d/.test(x));
       if (setup) ev.labels.Setup = title(setup);
-      const box = t.find((x) => /^BOX \d+$/.test(x));
-      if (box) ev.labels.Zone = title(box);
       if (!winner) warnings.push(`Kick-out at ${ev.minute}′ (${ev.half}) has no winner tagged.`);
     } else if (/^TURNOVER( LOST)?$/.test(rest)) {
       ev.event_type = 'Turnover';
