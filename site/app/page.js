@@ -125,6 +125,14 @@ export default async function Home({ searchParams }) {
         </div>
       )}
 
+      {(who === 'ros' || team) && (
+        <p className="report-link">
+          <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}${year ? `?year=${year}` : ''}`}>
+            {who === 'ros' ? 'Roscommon' : team} team report: kick-outs, shooting, quarters, turnovers →
+          </a>
+        </p>
+      )}
+
       {sum.P > 0 && (
         <div className="card season">
           <div className="season-label muted small">{who === 'opp' ? team : 'Roscommon'}</div>

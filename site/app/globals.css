@@ -146,3 +146,33 @@ header{display:flex;justify-content:space-between;align-items:center}header a.na
 .team-chips .chip.on{background:var(--dk);color:#fff}
 .season{position:relative;padding-top:26px}
 .season-label{position:absolute;top:8px;left:16px;font-weight:700}
+.vs-val{font-weight:700;font-size:.95rem;display:flex;flex-direction:column;line-height:1.15}
+.vs-row .vs-val:first-child{align-items:flex-end;text-align:right}
+.vs-val small{font-weight:400;font-size:.68rem;color:var(--mut)}
+.vs-heading{text-align:center;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700;margin:10px 0 2px}
+
+/* ---------- Report sections ---------- */
+.center{text-align:center}
+.takeaway{font-weight:700;margin:14px 0 4px;padding-top:12px;border-top:1px solid #e7ece8}
+.zones{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+@media (max-width:560px){.zones{grid-template-columns:1fr}}
+.zone-title{text-align:center;font-weight:700;font-size:.85rem;margin-bottom:6px}
+.zone-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.zone{position:relative;border:1px solid #dfe6e0;border-radius:6px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fafcf9}
+.zone b{font-size:1.15rem;line-height:1}
+.zone-no{position:absolute;top:3px;left:6px;font-size:.68rem;color:var(--mut)}
+.zone-wl{font-size:.7rem;color:var(--dk);margin-top:2px}
+.thirds{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cfd8d0;border-radius:10px;overflow:hidden}
+.third{padding:14px 8px;text-align:center;border-right:2px dashed #d7c27a}
+.third:last-child{border-right:0}
+.third.att{background:#f3f6f1}
+.third-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--mut)}
+.third-nums{display:flex;justify-content:center;gap:18px;margin-top:8px}
+.third-nums div{display:flex;flex-direction:column}
+.third-nums b{font:700 2rem Georgia,serif;font-variant-numeric:tabular-nums}
+.third-nums b.lost{color:#b4432f}
+.third-nums span{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+@media (max-width:560px){.third-nums{gap:10px}.third-nums b{font-size:1.5rem}}
+.game-strip{margin:8px 0 6px}
+.game.untagged{opacity:.6}
+.report-link{margin:4px 0 10px;font-weight:600}

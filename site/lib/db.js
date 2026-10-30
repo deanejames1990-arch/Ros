@@ -21,3 +21,17 @@ export async function hiddenPlayerIds(ids) {
     .eq('matches.competitions.show_player_names', false);
   return new Set((data || []).map((r) => r.player_id));
 }
+
+const EVENT_COLS = 'id, team_id, event_type, outcome, minute, half, start_sec, player_no, code, labels';
+
+// Supabase returns at most 1,000 rows per request, so page through a match's events.
+export async function loadEvents(matchId) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from('events').select(EVENT_COLS).eq('match_id', matchId)
+      .order('start_sec', { ascending: true }).order('id', { ascending: true }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}

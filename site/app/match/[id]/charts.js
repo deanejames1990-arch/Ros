@@ -11,12 +11,13 @@ export function Versus({ rows, a, b }) {
         <span><i className="sw" style={{ background: a.color }} />{a.name}</span>
         <span>{b.name}<i className="sw" style={{ background: b.color }} /></span>
       </div>
-      {rows.map((r) => {
+      {rows.map((r, i) => {
+        if (r.heading) return <div className="vs-heading" key={`h-${r.heading}`}>{r.heading}</div>;
         const max = Math.max(r.a ?? 0, r.b ?? 0, r.max ?? 0) || 1;
         const fmt = r.fmt || ((v) => v ?? '—');
         return (
-          <div className="vs-row" key={r.label}>
-            <b className="num">{fmt(r.a)}</b>
+          <div className="vs-row" key={`${i}-${r.label}`}>
+            <span className="num vs-val">{fmt(r.a)}{r.aNote && <small>{r.aNote}</small>}</span>
             <div className="vs-bar left" title={`${a.name}: ${fmt(r.a)} ${r.label}`}>
               <span style={{ width: `${(100 * (r.a ?? 0)) / max}%`, background: a.color }} />
             </div>
@@ -24,7 +25,7 @@ export function Versus({ rows, a, b }) {
             <div className="vs-bar" title={`${b.name}: ${fmt(r.b)} ${r.label}`}>
               <span style={{ width: `${(100 * (r.b ?? 0)) / max}%`, background: b.color }} />
             </div>
-            <b className="num">{fmt(r.b)}</b>
+            <span className="num vs-val">{fmt(r.b)}{r.bNote && <small>{r.bNote}</small>}</span>
           </div>
         );
       })}

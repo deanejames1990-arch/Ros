@@ -1,27 +1,14 @@
 import { notFound } from 'next/navigation';
-import { db, MATCH_SELECT } from '../../../lib/db';
+import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf } from '../../../lib/analysis';
 import { score } from '../../components';
-import { Versus, ScoringFlow, KickoutBar, SourceBars, pctTxt } from './charts';
+import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
+import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
 
 const ROS = '#1f5fa8'; // Roscommon blue
 const OPP = '#b8760f'; // opposition amber
-
-const EVENT_COLS = 'id, team_id, event_type, outcome, minute, half, start_sec, player_no, code, labels';
-
-// Supabase returns at most 1,000 rows per request, so page through the match.
-async function loadEvents(matchId) {
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from('events').select(EVENT_COLS).eq('match_id', matchId)
-      .order('start_sec', { ascending: true }).order('id', { ascending: true }).range(from, from + 999);
-    if (error) throw new Error(error.message);
-    out.push(...(data || []));
-    if (!data || data.length < 1000) return out;
-  }
-}
 
 export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();
@@ -161,35 +148,25 @@ export default async function Match({ params, searchParams }) {
             </table>
           </div>
 
-          {r.has.kickout && <h2>Kick-outs</h2>}
-          {r.has.kickout && <div className="grid2">
-            {[A, B].map((t) => {
-              const k = r.byTeam[t.id].kickouts;
-              return (
+          <KickoutSection A={A} B={B} a={a} b={b} />
+          {view === 'analyst' && [A, B].some((t) => r.byTeam[t.id].kickoutSetups.some((x) => x.key !== '—')) && (
+            <div className="grid2">
+              {[A, B].map((t) => (
                 <div className="card" key={t.id}>
-                  <h3><i className="sw" style={{ background: t.color }} />{t.name} kick-outs</h3>
-                  <p className="kpi"><b>{k.retained}/{k.total}</b> won · {pctTxt(k.retPct)}</p>
-                  <KickoutBar k={k} color={t.color} />
-                  {view === 'analyst' && r.byTeam[t.id].kickoutSetups.some((x) => x.key !== '—') && (
-                    <table className="nums small-table">
-                      <thead><tr><th>Setup faced</th><th>No.</th></tr></thead>
-                      <tbody>{r.byTeam[t.id].kickoutSetups.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
-                    </table>
-                  )}
-                  {k.byDist.length > 0 && (
-                    <table className="nums small-table">
-                      <thead><tr><th>Length</th><th>Won</th><th>%</th></tr></thead>
-                      <tbody>
-                        {k.byDist.map((d) => (
-                          <tr key={d.dist}><td>{distName(d.dist)}</td><td>{d.won}/{d.total}</td><td>{pctTxt(d.pct)}</td></tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                  <h3><i className="sw" style={{ background: t.color }} />Setup faced on {t.name} kick-outs</h3>
+                  <table className="nums small-table">
+                    <tbody>{r.byTeam[t.id].kickoutSetups.map((x) => <tr key={x.key}><td>{x.key}</td><td>{x.n}</td></tr>)}</tbody>
+                  </table>
                 </div>
-              );
-            })}
-          </div>}
+              ))}
+            </div>
+          )}
+
+          <ShootingSection A={A} B={B} a={a} b={b} />
+
+          {period === 'All' && <PeriodSection A={A} B={B} a={a} b={b} />}
+
+          <TurnoverSection A={A} B={B} a={a} />
 
           <h2>Where the scores came from</h2>
           <div className="grid2">

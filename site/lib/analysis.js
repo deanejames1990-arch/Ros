@@ -35,6 +35,25 @@ export function quarterOf(e) {
   return second ? (m < 17.5 || m >= 35 && m < 52.5 ? 'Q3' : 'Q4') : (m < 17.5 ? 'Q1' : 'Q2');
 }
 
+// Box number from a "Box 5" style tag, as a string ('0'..'15'), or null.
+export const zoneOf = (e) => {
+  const z = lbl(e, 'Zone');
+  const m = z && String(z).match(/(\d+)/);
+  return m ? m[1] : null;
+};
+
+// Pitch third from the point of view of the team on the event. Files tag this as
+// INSIDE/MID/DEF 45, own/middle/attacking third, or Opp/Middle/Own Third.
+export const thirdOf = (e) => {
+  const a = String(lbl(e, 'PitchArea') || '').toLowerCase();
+  if (!a) return null;
+  if (/inside|opp|attack/.test(a)) return 'Att';
+  if (/mid/.test(a)) return 'Mid';
+  if (/def|own/.test(a)) return 'Def';
+  return null;
+};
+const MIRROR = { Att: 'Def', Mid: 'Mid', Def: 'Att' };
+
 export const halfOf = (e) => e.half || lbl(e, 'Half') || (['Q3', 'Q4'].includes(quarterOf(e)) ? '2nd Half' : '1st Half');
 
 function inPeriod(e, period) {
@@ -170,6 +189,49 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     const goals = scored.filter((s) => s.value === 3).length;
     const pointsTotal = scored.reduce((n, s) => n + s.value, 0);
 
+    // What happened to the shots
+    const isTwo = (s) => s.value === 2 || lbl(s.e, 'Attempt') === '2 Point' || /2\s*p(oin)?t/i.test(s.e.outcome || '');
+    const shotsDetail = {
+      singles: scored.filter((s) => s.value === 1).length,
+      twoTried: shots.filter(isTwo).length,
+      twoScored: scored.filter((s) => s.value === 2).length,
+      goals,
+      wides: shots.filter((s) => !s.value && /wide/i.test(s.e.outcome || '')).length,
+      savedBlocked: shots.filter((s) => !s.value && !/wide/i.test(s.e.outcome || '')).length,
+    };
+
+    // Boxes: where shots were taken and where own kick-outs landed
+    const shotBoxes = {};
+    for (const s of shots) {
+      const z = zoneOf(s.e);
+      if (z == null) continue;
+      const r = (shotBoxes[z] ||= { shots: 0, scored: 0 });
+      r.shots += 1;
+      if (s.value) r.scored += 1;
+    }
+    const koZones = {};
+    for (const k of kos) {
+      const z = zoneOf(k.e);
+      if (z == null) continue;
+      const r = (koZones[z] ||= { n: 0, won: 0 });
+      r.n += 1;
+      if (k.won) r.won += 1;
+    }
+
+    // Halves and quarters: points, shots, own kick-outs retained
+    const periodRow = (key, test) => {
+      const ps = shots.filter((s) => test(s.e));
+      const ks = kos.filter((k) => test(k.e) && k.won !== null);
+      return { key, points: ps.reduce((n, s) => n + s.value, 0), shots: ps.length, koWon: ks.filter((k) => k.won).length, koTotal: ks.length };
+    };
+    const quarters = QUARTERS.map((q) => periodRow(q, (e) => quarterOf(e) === q));
+    const halves = ['1st Half', '2nd Half'].map((h, i) => periodRow(`H${i + 1}`, (e) => halfOf(e) === h));
+
+    // Turnovers by third, in this team's frame
+    const thirds = { conceded: { Def: 0, Mid: 0, Att: 0, none: 0 }, wonBack: { Def: 0, Mid: 0, Att: 0, none: 0 } };
+    for (const e of turnoversLost) thirds.conceded[thirdOf(e) || 'none'] += 1;
+    for (const e of turnoversWon) { const th = thirdOf(e); thirds.wonBack[th ? MIRROR[th] : 'none'] += 1; }
+
     byTeam[t.id] = {
       team: t,
       goals,
@@ -198,6 +260,13 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       kickoutSetups: count(kos.map((k) => k.e), (e) => lbl(e, 'Setup')),
       foulsByArea: count(fouls, (e) => lbl(e, 'PitchArea')),
       shooters,
+      shotsDetail,
+      ptsPerShot: shots.length ? pointsTotal / shots.length : null,
+      shotBoxes,
+      kickoutZones: koZones,
+      quarters,
+      halves,
+      thirds,
     };
   }
 
@@ -245,4 +314,52 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     has: { poss: has('Poss'), attack: has('Attack'), turnover: has('Turnover'), foul: has('Foul'), kickout: has('Kickout'),
       area: hasLabel('PitchArea'), turnoverType: hasLabel('TurnoverType'), setup: hasLabel('Setup'), goalChance: hasLabel('GoalChance') },
   };
+}
+
+// ---- Combining games ------------------------------------------------------
+// Sums one side's numbers across several games (a team page: "Armagh, 5 games")
+// and recomputes the rates. Each item is a byTeam entry from analyseMatch.
+const add = (a = 0, b = 0) => a + b;
+export function combineSides(list) {
+  const out = {
+    games: list.length, total: 0, goals: 0, points: 0, shots: 0, scores: 0, possessions: 0, attacks: 0, wides: 0,
+    turnoversWon: 0, turnoversLost: 0, fouls: 0,
+    shotsDetail: { singles: 0, twoTried: 0, twoScored: 0, goals: 0, wides: 0, savedBlocked: 0 },
+    kickouts: { total: 0, wonClean: 0, wonBreak: 0, lostBreak: 0, lostClean: 0, unknown: 0, retained: 0 },
+    koDist: {}, shotBoxes: {}, kickoutZones: {},
+    quarters: QUARTERS.map((q) => ({ key: q, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
+    halves: ['H1', 'H2'].map((h) => ({ key: h, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
+    thirds: { conceded: { Def: 0, Mid: 0, Att: 0, none: 0 }, wonBack: { Def: 0, Mid: 0, Att: 0, none: 0 } },
+    sources: {},
+  };
+  for (const s of list) {
+    for (const k of ['total', 'goals', 'points', 'shots', 'scores', 'possessions', 'attacks', 'wides', 'turnoversWon', 'turnoversLost', 'fouls']) out[k] += s[k] || 0;
+    for (const k in out.shotsDetail) out.shotsDetail[k] += s.shotsDetail?.[k] || 0;
+    for (const k in out.kickouts) out.kickouts[k] += s.kickouts?.[k] || 0;
+    for (const d of s.kickouts?.byDist || []) {
+      const r = (out.koDist[d.dist] ||= { dist: d.dist, total: 0, won: 0 });
+      r.total += d.total; r.won += d.won;
+    }
+    for (const [z, r] of Object.entries(s.shotBoxes || {})) {
+      const o = (out.shotBoxes[z] ||= { shots: 0, scored: 0 }); o.shots += r.shots; o.scored += r.scored;
+    }
+    for (const [z, r] of Object.entries(s.kickoutZones || {})) {
+      const o = (out.kickoutZones[z] ||= { n: 0, won: 0 }); o.n += r.n; o.won += r.won;
+    }
+    for (const key of ['quarters', 'halves']) {
+      (s[key] || []).forEach((r, i) => { for (const f of ['points', 'shots', 'koWon', 'koTotal']) out[key][i][f] = add(out[key][i][f], r[f]); });
+    }
+    for (const side of ['conceded', 'wonBack']) for (const k in out.thirds[side]) out.thirds[side][k] += s.thirds?.[side]?.[k] || 0;
+    for (const r of s.sources || []) {
+      const o = (out.sources[r.source] ||= { source: r.source, shots: 0, scores: 0, points: 0 });
+      o.shots += r.shots; o.scores += r.scores; o.points += r.points;
+    }
+  }
+  out.conv = pct(out.scores, out.shots);
+  out.ptsPerShot = out.shots ? out.total / out.shots : null;
+  const k = out.kickouts;
+  k.retPct = pct(k.retained, k.total - k.unknown);
+  k.byDist = Object.values(out.koDist).sort((a, b) => a.dist.localeCompare(b.dist)).map((d) => ({ ...d, pct: pct(d.won, d.total) }));
+  out.sources = Object.values(out.sources).map((r) => ({ ...r, conv: pct(r.scores, r.shots) })).sort((a, b) => b.points - a.points);
+  return out;
 }
