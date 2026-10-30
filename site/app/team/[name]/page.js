@@ -3,6 +3,7 @@ import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, combineSides, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
+import { PrintButton, SectionImages } from '../../report/Export';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,9 +75,11 @@ export default async function TeamReport({ params, searchParams }) {
   return (
     <>
       <p className="muted"><a href="/">All games</a></p>
-      <div className="hero">
+      <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
         <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}</h1>
+        <PrintButton />
       </div>
+      <SectionImages />
       <nav className="toolbar">
         {grades.length > 1 && (
           <div className="seg">

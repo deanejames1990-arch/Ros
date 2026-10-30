@@ -125,7 +125,7 @@ export default async function Home({ searchParams }) {
       {(who === 'ros' || team) && (
         <p className="report-link">
           <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}) })}`}>
-            {who === 'ros' ? 'Roscommon' : team} team report: kick-outs, shooting, quarters, turnovers →
+            Open the {who === 'ros' ? 'Roscommon' : team} report: kick-outs, shooting, quarters, turnovers, players →
           </a>
         </p>
       )}

@@ -13,6 +13,7 @@ export default async function RootLayout({ children }) {
           <a href="/" className="brand"><img src="/crest.png" alt="Roscommon GAA crest" />Roscommon GAA Stats</a>
           {role && (
             <nav className="nav-links">
+              <a className="nav" href="/teams">Teams</a>
               {role === 'admin' && <a className="nav" href="/admin/import">Add game</a>}
               {role === 'admin' && <a className="nav" href="/admin">Manage</a>}
               {authEnabled() && <a className="nav" href="/logout">Log out</a>}

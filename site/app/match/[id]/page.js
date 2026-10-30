@@ -4,6 +4,7 @@ import { currentRole } from '../../../lib/session';
 import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
+import { PrintButton, SectionImages } from '../../report/Export';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -54,21 +55,28 @@ export default async function Match({ params, searchParams }) {
   };
 
   const hasEvents = events.length > 0;
+  const teamHref = (name) => `/team/${encodeURIComponent(name)}?${new URLSearchParams({ grade: m.competitions.grade || 'Senior', year: String(m.competitions.seasons.year) })}`;
   const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
 
   return (
     <>
       <p className="muted">
-        {role === 'admin' && <><a href={`/admin/game/${m.id}`}>Edit game</a> · </>}
+        {role === 'admin' && <span className="no-print"><a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
         <a href="/">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
       </p>
-      <div className="scoreline">
-        <span className="team"><i className="sw" style={{ background: A.color }} />{A.name}</span>
+      <div className="scoreline" data-export-title={`${A.name} ${score(m.team1_goals, m.team1_points)} – ${score(m.team2_goals, m.team2_points)} ${B.name} · ${m.competitions.name} ${m.competitions.seasons.year}${m.stage ? ` · ${m.stage}` : ''} · ${m.match_date}`}>
+        <a className="team" href={teamHref(A.name)} title={`${A.name} team report`}><i className="sw" style={{ background: A.color }} />{A.name}</a>
         <span className="big">{score(m.team1_goals, m.team1_points)}</span>
         <span className="dash">–</span>
         <span className="big">{score(m.team2_goals, m.team2_points)}</span>
-        <span className="team">{B.name}<i className="sw" style={{ background: B.color }} /></span>
+        <a className="team" href={teamHref(B.name)} title={`${B.name} team report`}>{B.name}<i className="sw" style={{ background: B.color }} /></a>
       </div>
+
+      <div className="export-bar no-print">
+        <span className="muted small">Team names open their full report.</span>
+        <PrintButton />
+      </div>
+      <SectionImages />
 
       {hasEvents && (
         <nav className="toolbar">
