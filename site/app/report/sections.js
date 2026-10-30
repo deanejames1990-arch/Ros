@@ -175,8 +175,11 @@ const COLS = [
   { k: 'shots', label: 'Shots' },
   { k: 'scores', label: 'Scores' },
   { k: 'conv', label: 'Conv', fmt: (p) => (p.shots ? `${Math.round((100 * p.scores) / p.shots)}%` : '—'), need: 'shots' },
+  { k: 'oneScored', label: '1-pt', need: 'oneTried', title: 'Single points scored' },
+  { k: 'oneTried', label: '1-pt att', title: 'Single-point attempts (any shot that wasn’t a 2-point attempt or a goal)' },
+  { k: 'twoScored', label: '2-pt', need: 'twoTried', title: 'Two-pointers scored' },
+  { k: 'twoTried', label: '2-pt att', title: 'Two-point attempts' },
   { k: 'goals', label: 'Goals' },
-  { k: 'twoTried', label: '2-pt', fmt: (p) => (p.twoTried ? `${p.twoScored}/${p.twoTried}` : '—') },
   { k: 'frees', label: 'Frees', fmt: (p) => (p.frees ? `${p.freesScored}/${p.frees}` : '—') },
   { k: 'wides', label: 'Wides' },
   { k: 'poss', label: 'Poss' },
@@ -216,7 +219,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
       {list.length > limit && <input type="checkbox" id={id} className="more-toggle" />}
       <div className="wrap">
         <table className="nums players">
-          <thead><tr><th>Player</th>{cols.map((c) => <th key={c.k}>{c.label}</th>)}</tr></thead>
+          <thead><tr><th>Player</th>{cols.map((c) => <th key={c.k} title={c.title}>{c.label}</th>)}</tr></thead>
           <tbody>
             {list.map((p, i) => (
               <tr key={p.name} className={i >= limit ? 'extra' : undefined}>
@@ -233,7 +236,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
         </label>
       )}
       <p className="muted small">
-        From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal.
+        From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal; att = attempts (scored + missed).
         {s.total > tagged && ` ${s.total - tagged} of ${T.name}’s ${s.total} points have no shooter tagged.`}
         {' '}Spelling differences in the tags show as separate players for now.
       </p>

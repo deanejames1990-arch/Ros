@@ -278,7 +278,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     if (!tid || !playerRows[tid] || !name) return null;
     const key = name.trim();
     return (playerRows[tid][key.toLowerCase()] ||= {
-      name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0,
+      name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0, oneTried: 0, oneScored: 0,
       frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
       tackles: 0, assists: 0, winbacks: 0, boxes: {},
     });
@@ -304,6 +304,8 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       if (v) r.scores += 1;
       if (v === 3) r.goals += 1;
       if (two) { r.twoTried += 1; if (v === 2) r.twoScored += 1; }
+      // A one-point attempt: any shot that wasn't a two-point attempt and didn't end in a goal.
+      else if (v !== 3) { r.oneTried += 1; if (v === 1) r.oneScored += 1; }
       if (placed) { r.frees += 1; if (v) r.freesScored += 1; }
       if (!v && /wide/i.test(e.outcome || '')) r.wides += 1;
       const z = zoneOf(e);
@@ -420,7 +422,7 @@ export function combineSides(list) {
       const k = pl.name.toLowerCase();
       const o = out.players[k];
       if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes } }; continue; }
-      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
+      for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
     }
     for (const r of s.sources || []) {
