@@ -298,7 +298,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       const r = prow(e.team_id, e.player_no || names[0]);
       if (!r) continue;
       const v = shotValue(e);
-      const placed = /\((F|45)\)/.test(e.event_type || '');
+      const placed = /\((F|45|Mark)\)/.test(e.event_type || '');
       const two = v === 2 || lbl(e, 'Attempt') === '2 Point';
       r.shots += 1; r.points += v;
       if (v) r.scores += 1;

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { unzipSync, strFromU8 } from 'fflate';
-import { parseNacsport, guessFromName } from '../../../lib/nacsport';
+import { parseNacsport, guessFromName, fromSportscodeXml } from '../../../lib/nacsport';
 import { importGame } from './actions';
 
 const GRADES = ['Senior', 'U20', 'Minor', 'Junior', 'Club'];
@@ -19,7 +19,10 @@ function readExport(bytes, name) {
   } else {
     text = strFromU8(bytes);
   }
-  return { json: JSON.parse(text.replace(/^﻿/, '')), inner: name };
+  text = text.replace(/^\uFEFF/, '');
+  // Sportscode / Hudl XML export
+  if (/^\s*</.test(text)) return { json: fromSportscodeXml(text, name), inner: name };
+  return { json: JSON.parse(text), inner: name };
 }
 
 const matchName = (list, guess) =>
@@ -123,7 +126,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
   return (
     <div className="import">
       <label className="drop">
-        <input type="file" accept=".nac_to_import,.json,.zip" onChange={(e) => onFile(e.target.files?.[0])} />
+        <input type="file" accept=".nac_to_import,.json,.zip,.xml" onChange={(e) => onFile(e.target.files?.[0])} />
         <span>{src ? src.fileName : 'Choose a Nacsport file'}</span>
       </label>
       {err && <p className="card check warn">{err}</p>}

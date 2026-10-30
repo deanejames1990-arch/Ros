@@ -19,7 +19,7 @@ export default async function ImportPage() {
       <p className="muted"><a href="/">All games</a></p>
       <h1>Add a game</h1>
       <p className="muted">
-        Drop in a Nacsport <b>.nac_to_import</b> file. You’ll see a preview and a score check before anything is saved.
+        Drop in a Nacsport <b>.nac_to_import</b> file or a Sportscode/Hudl <b>.xml</b> export. You’ll see a preview and a score check before anything is saved.
         Loading the same file again updates that game instead of adding a copy.
       </p>
       <ImportForm

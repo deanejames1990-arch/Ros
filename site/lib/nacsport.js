@@ -10,7 +10,7 @@
 //                names are always our players; HIGH/MIDDLE/LOW is our end-to-end)
 // Anything else is kept in the event log with its original name.
 
-const MISS = ['WIDE', 'SHORT', 'BLOCK', 'BLOCKED', 'SAVE', 'SAVED', 'POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK', 'MISS'];
+const MISS = ['WIDE', 'SHORT', 'BLOCK', 'BLOCKED', 'SAVE', 'SAVED', 'POST', 'OFF POST', 'OUT FOR 45', 'SHORT_SAVE_BLOCK', 'MISS'];
 const SOURCES = {
   'FROM KO OWN': 'Own Kickout',
   'FROM KO OPP': 'Opp Kickout',
@@ -65,6 +65,9 @@ const OUROPP = {
   'FREE WON': ['A', 'FREE WON'], 'FREE CONCEDED': ['A', 'FOUL'],
   'OUR CARD': ['A', 'CARD'], 'OPP CARD': ['B', 'CARD'],
   'TACKLE': ['A', 'TACKLE'], 'ASSIST': ['A', 'ASSIST'],
+  'SHOT FROM 45': ['A', '45'], 'OUR SHOT FROM 45': ['A', '45'], 'OPP SHOT FROM 45': ['B', '45'],
+  'SHOT FROM MARK': ['A', 'SHOT (M)'], 'OUR SHOT FROM MARK': ['A', 'SHOT (M)'], 'OPP SHOT FROM MARK': ['B', 'SHOT (M)'],
+  'THROW IN WON': ['A', 'THROW IN'], 'THROW IN LOST': ['B', 'THROW IN'],
 };
 const OUROPP_SKIP = /^(OUR|OPP) KO RESULT$/;
 
@@ -72,7 +75,7 @@ const OUROPP_SKIP = /^(OUR|OPP) KO RESULT$/;
 function ouroppSource(phrase, side) {
   const p = phrase.replace(/^(PS|OPS) /, '').replace(/ SO$/, '').trim();
   const ours = side === 'A';
-  if (/^(WINBACK|TURNOVER|OPP TO|OUR TO|UNFORCED( WB| TO)?)$/.test(p)) return 'Turnover';
+  if (/\b(WINBACK|TURNOVER|TO|WB|UNFORCED)\b/.test(p)) return 'Turnover';
   if (p === 'OUR KICKOUT') return ours ? 'Own Kickout' : 'Opp Kickout';
   if (p === 'OPP KICKOUT') return ours ? 'Opp Kickout' : 'Own Kickout';
   if (p === 'OUR SHOT SHORT') return ours ? 'Rebound' : 'Opp shot dropped short';
@@ -90,6 +93,10 @@ export function readTables(json) {
   if (!tabs.Mediciones) throw new Error('This file has no tagged events (no "Mediciones" table). Is it a Nacsport analysis export?');
   return tabs;
 }
+
+const COUNTIES = ['Antrim', 'Armagh', 'Carlow', 'Cavan', 'Clare', 'Cork', 'Derry', 'Donegal', 'Down', 'Dublin', 'Fermanagh', 'Galway',
+  'Kerry', 'Kildare', 'Kilkenny', 'Laois', 'Leitrim', 'Limerick', 'Longford', 'Louth', 'Mayo', 'Meath', 'Monaghan', 'Offaly',
+  'Roscommon', 'Sligo', 'Tipperary', 'Tyrone', 'Waterford', 'Westmeath', 'Wexford', 'Wicklow', 'London', 'New York'];
 
 // Guess teams, date, competition and stage from the file name.
 export function guessFromName(name = '', videoName = '') {
@@ -109,11 +116,19 @@ export function guessFromName(name = '', videoName = '') {
   const d8 = both.match(/(?:^|[^\d])(20\d{2})(\d{2})(\d{2})(?!\d)/);
   const d6 = both.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/);
   const ok = (m) => m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31;
+  const dmy = `${clean(name)} ${clean(videoName)}`.match(/(?:^|\D)(\d{2})[ .-](\d{2})[ .-](\d{2}|\d{4})(?!\d)/);
   if (ok(d8)) date = `${d8[1]}-${d8[2]}-${d8[3]}`;
-  else if (ok(d6)) date = `20${d6[1]}-${d6[2]}-${d6[3]}`;
+  else if (dmy && +dmy[2] >= 1 && +dmy[2] <= 12 && +dmy[1] >= 1 && +dmy[1] <= 31) {
+    date = `${dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  } else if (ok(d6)) date = `20${d6[1]}-${d6[2]}-${d6[3]}`;
 
   const u = base.toUpperCase();
   let competition = '';
+  if (!home && !away) {
+    // One county named on its own (e.g. "Mayo_Rd1_Total"): Roscommon v that county.
+    const c = COUNTIES.find((x) => new RegExp(`\\b${x}\\b`, 'i').test(base) && !/roscommon/i.test(x));
+    if (c) { home = 'Roscommon'; away = c; }
+  }
   if (/\bNFL\d*|\bLEAGUE\b/.test(u)) competition = 'National Football League';
   else if (/\bAI[C]?\b|ALL[- ]IRELAND/.test(u)) competition = 'All-Ireland SFC';
   else if (/\bCSFC\b|CONNACHT/.test(u)) competition = 'Connacht SFC';
@@ -257,8 +272,9 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     } else if (rest === 'ATTACK') {
       ev.event_type = 'Attack';
     } else if (/^SHOT\b|^45$/.test(rest)) {
-      const placed = /\(F\)/.test(rest) || rest === '45' || t.includes('FROM FREE');
-      ev.event_type = rest === '45' ? 'Shot (45)' : placed ? 'Shot (F)' : 'Shot (P)';
+      const mark = /\(M\)/.test(rest);
+      const placed = /\(F\)/.test(rest) || mark || rest === '45' || t.includes('FROM FREE');
+      ev.event_type = rest === '45' ? 'Shot (45)' : mark ? 'Shot (Mark)' : placed ? 'Shot (F)' : 'Shot (P)';
       const missTag = MISS.find((x) => t.includes(x));
       const scored = t.includes('GOAL') || t.includes('POINT') || t.includes('SCORE') || (t.includes('2 POINT') && !missTag);
       ev.outcome = scored
@@ -266,7 +282,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
         : missTag ? title(missTag.replace('SHORT_SAVE_BLOCK', 'Short/Save/Block')) : 'No score';
       if (!scored && (t.includes('2 POINT') || t.includes('2 POINT ATTEMPT'))) ev.labels.Attempt = '2 Point';
       if (t.includes('GOAL CHANCE')) ev.labels.GoalChance = 'Yes';
-      let src = rest === '45' ? '45' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
+      let src = rest === '45' ? '45' : mark ? 'Mark' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
       // The HOME/AWAY template only marks frees, so everything else is open play.
       if (!src && template === 'HOME/AWAY') src = 'From play';
       if (src) ev.labels.Source = src;
@@ -318,7 +334,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       ev.event_type = 'Assist';
       const how = t.find((x) => /PASS$/.test(x));
       if (how) ev.labels.How = title(how);
-    } else if (cat === 'THROW IN') {
+    } else if (cat === 'THROW IN' || rest === 'THROW IN') {
       ev.event_type = 'Throw In';
     } else {
       unmapped.add(cat);
@@ -338,7 +354,9 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   const counts = {};
   for (const e of events) counts[e.event_type] = (counts[e.event_type] || 0) + 1;
   if (unmapped.size) warnings.push(`Kept in the event log only: ${[...unmapped].join(', ')}.`);
-  if (!throwIns.length && !markers.length) warnings.push('No throw-in or period markers found, so halves and quarters are estimated.');
+  const halfTagged = meds.some((m) => tagHalf(m));
+  if (!throwIns.length && !markers.length && !halfTagged) warnings.push('No throw-in, period or half markers found, so halves and quarters are estimated.');
+  else if (!markers.length && halfTagged && !throwIns.length) warnings.push('Halves come from the 1st/2nd half tags; quarters are each half split in two.');
 
   return {
     template,
@@ -349,5 +367,52 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     warnings,
     video: video.Nombre_Archivo || '',
     guess: guessFromName(fileName, video.Nombre_Archivo || ''),
+  };
+}
+
+// ---- Sportscode / Hudl XML -------------------------------------------------
+// Reads an XML export (<file><ALL_INSTANCES><instance>…) into the same tables a
+// Nacsport export has, so parseNacsport can read it. Times are in seconds.
+// Some exports put each half on its own clock starting at 0; the second half
+// is then moved to start after the first so the game reads in order.
+const unescape = (x) => x.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const XML_FPS = 25;
+
+export function fromSportscodeXml(text, fileName = '') {
+  const blocks = text.match(/<instance>[\s\S]*?<\/instance>/g) || [];
+  if (!blocks.length) throw new Error('No <instance> entries found in this XML file.');
+  const get = (b, tag) => { const m = b.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`)); return m ? unescape(m[1].trim()) : ''; };
+  const rows = blocks.map((b, i) => ({
+    id: Number(get(b, 'ID')) || i + 1,
+    start: Number(get(b, 'start')) || 0,
+    end: Number(get(b, 'end')) || 0,
+    code: get(b, 'code'),
+    labels: (b.match(/<label>[\s\S]*?<\/label>/g) || []).map((l) => get(l, 'text')).filter(Boolean),
+  })).filter((r) => r.code);
+
+  const halfOf = (r) => {
+    const u = r.labels.map((x) => x.toUpperCase());
+    if (u.some((x) => x === '1ST H' || x === '1ST HALF')) return 1;
+    if (u.some((x) => x === '2ND H' || x === '2ND HALF')) return 2;
+    return 0;
+  };
+  const first = rows.filter((r) => halfOf(r) === 1), second = rows.filter((r) => halfOf(r) === 2);
+  let shift = 0;
+  if (first.length && second.length) {
+    const firstEnd = Math.max(...first.map((r) => r.start));
+    const secondStart = Math.min(...second.map((r) => r.start));
+    if (secondStart < firstEnd) shift = firstEnd + 60;
+  }
+  const Mediciones = {}, DesTex = {};
+  let d = 0;
+  for (const r of rows) {
+    const off = halfOf(r) === 2 ? shift : 0;
+    Mediciones[r.id] = { Categoria: r.code.toUpperCase(), 'Id_Medición': r.id, TI: Math.round((r.start + off) * XML_FPS), TF: Math.round((r.end + off) * XML_FPS) };
+    for (const l of r.labels) DesTex[++d] = { idm: r.id, DesTexto: l };
+  }
+  return {
+    0: { table: 'Mediciones', fields: Mediciones },
+    1: { table: 'DesTex', fields: DesTex },
+    2: { table: 'Videos', fields: { 1: { fps: XML_FPS, Nombre_Archivo: fileName } } },
   };
 }
