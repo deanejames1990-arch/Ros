@@ -6,6 +6,7 @@ import { toRow, fromRow, quarterFor, parseSheet, outsideArc, liveScore } from '.
 import { GRID } from '../../../report/sections';
 import { PitchLines, VIEW } from '../../../report/ShotMap';
 import LiveReport from './LiveReport';
+import Trends from '../../../report/Trends';
 
 const COLORS = ['#3b4f9e', '#c4572a'];
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -97,6 +98,7 @@ export default function Tagger({ match, teams, saved }) {
   const [clock, setClock] = useState({ half: 0, running: false, base: 0, since: 0 });
   const [sheets, setSheets] = useState({});
   const [view, setView] = useState('tag');
+  const [trendMin, setTrendMin] = useState(10);
   const [edit, setEdit] = useState(null); // event being added or changed
   const [toast, setToast] = useState(null);
   const [sync, setSync] = useState({ state: 'saved', dirty: 0, msg: '' });
@@ -262,7 +264,7 @@ export default function Tagger({ match, teams, saved }) {
           </span>
         </div>
         <nav className="seg lt-tabs">
-          {[['tag', 'Tag'], ['report', 'Report'], ['log', `Log (${events.length})`], ['sheets', 'Team sheets']].map(([k, t]) => (
+          {[['tag', 'Tag'], ['trends', 'Trends'], ['report', 'Report'], ['log', `Log (${events.length})`], ['sheets', 'Team sheets']].map(([k, t]) => (
             <button key={k} type="button" className={view === k ? 'on' : ''} onClick={() => setView(k)}>{t}</button>
           ))}
         </nav>
@@ -287,6 +289,12 @@ export default function Tagger({ match, teams, saved }) {
           {clock.half === 0 && <p className="muted small lt-hint">Start the clock at the throw-in so every tag gets its minute and quarter. You can tag before then; it counts as minute 0.</p>}
         </div>
       )}
+
+      {view === 'trends' && (
+        <Trends events={rows} teams={teams.map((t, i) => ({ ...t, color: COLORS[i] }))} halfLen={match.halfLen} windowMin={trendMin} usId={teams[0].id}
+          controls={<span className="seg trend-win">{[5, 10, 15].map((n) => <button key={n} type="button" className={trendMin === n ? 'on' : ''} onClick={() => setTrendMin(n)}>{n} min</button>)}</span>} />
+      )}
+      {view === 'trends' && events.length === 0 && <p className="muted">Trends appear once you start tagging.</p>}
 
       {view === 'report' && <LiveReport rows={rows} teams={teams} match={match} initial={reportStart} />}
 

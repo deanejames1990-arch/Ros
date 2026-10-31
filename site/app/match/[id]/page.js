@@ -8,6 +8,7 @@ import { PrintButton, SectionImages } from '../../report/Export';
 import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
 import { isLiveCode } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
+import Trends from '../../report/Trends';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,7 @@ export default async function Match({ params, searchParams }) {
   const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
 
   // A game started in the live tagger on or about today: keep the page updating.
+  const trendMin = [5, 10, 15].includes(Number(searchParams.trend)) ? Number(searchParams.trend) : 10;
   const liveNow = isLiveCode(m.match_code) && Math.abs(Date.now() - new Date(m.match_date).getTime()) < 36 * 3600 * 1000;
 
   return (
@@ -109,6 +111,15 @@ export default async function Match({ params, searchParams }) {
             {' · '}{r.total} events loaded
           </div>
         </div>
+      )}
+
+      {hasEvents && liveNow && (
+        <>
+          <h2>Trends</h2>
+          <Trends events={events} teams={[A, B]} usId={rosIdx === -1 ? null : teams[rosIdx].id}
+            halfLen={Number(String(m.match_code).split('-')[2]) || 35} windowMin={trendMin}
+            controls={<span className="seg trend-win no-print">{[5, 10, 15].map((n) => <a key={n} href={`?${new URLSearchParams({ ...(period !== 'All' ? { period } : {}), ...(view === 'analyst' ? { view } : {}), trend: String(n) })}`} className={trendMin === n ? 'on' : ''}>{n} min</a>)}</span>} />
+        </>
       )}
 
       {hasEvents && (
