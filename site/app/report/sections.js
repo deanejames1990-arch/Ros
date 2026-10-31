@@ -9,7 +9,8 @@ const rate = (a, b) => (b ? Math.round((100 * a) / b) : null);
 // Kick-out landing boxes laid out as on the pitch: 3 columns, 5 rows.
 export const GRID = [['2', '3', '4'], ['5', '6', '7'], ['8', '0', '9'], ['10', '11', '12'], ['13', '14', '15']];
 
-export function ZoneGrid({ name, zones, color }) {
+// kind 'ko': kick-outs per box with won/lost; kind 'shot': shots per box with scored.
+export function ZoneGrid({ name, zones, color, kind = 'ko' }) {
   const max = Math.max(1, ...Object.values(zones).map((z) => z.n));
   return (
     <div className="zone-wrap">
@@ -20,10 +21,10 @@ export function ZoneGrid({ name, zones, color }) {
           const shade = z ? 0.15 + 0.6 * (z.n / max) : 0;
           return (
             <div key={b} className="zone" style={z ? { background: `color-mix(in srgb, ${color} ${Math.round(shade * 100)}%, #fff)` } : undefined}
-              title={z ? `Box ${b}: ${z.n} kick-outs, ${z.won} won, ${z.n - z.won} lost` : `Box ${b}: none`}>
+              title={z ? (kind === 'shot' ? `Box ${b}: ${z.n} shots, ${z.won} scored` : `Box ${b}: ${z.n} kick-outs, ${z.won} won, ${z.n - z.won} lost`) : `Box ${b}: none`}>
               <span className="zone-no">{b}</span>
               {z && <b>{z.n}</b>}
-              {z && <span className="zone-wl">{z.won}W {z.n - z.won}L</span>}
+              {z && <span className="zone-wl">{kind === 'shot' ? `${z.won} scored` : `${z.won}W ${z.n - z.won}L`}</span>}
             </div>
           );
         })}
@@ -59,7 +60,7 @@ export function KickoutSection({ A, B, a, b }) {
         ]} />
         {hasZones ? (
           <>
-            <div className="vs-heading">Landing zone (box number, pitch layout)</div>
+            <div className="vs-heading">Landing zone (box number, kicking team’s goal at the top)</div>
             <div className="zones">
               <ZoneGrid name={A.name} zones={a.kickoutZones || {}} color={A.color} />
               <ZoneGrid name={B.name} zones={b.kickoutZones || {}} color={B.color} />
@@ -102,12 +103,16 @@ export function ShootingSection({ A, B, a, b }) {
           { label: 'Goals', a: da.goals, b: db.goals },
           { label: 'Wides', a: da.wides, b: db.wides },
           { label: 'Saved / blocked', a: da.savedBlocked, b: db.savedBlocked },
-          ...(boxes.length ? [{ heading: 'Where shots were taken (box number)' }] : []),
-          ...boxes.map((z) => {
-            const x = a.shotBoxes?.[z], y = b.shotBoxes?.[z];
-            return { label: `Box ${z}`, a: x?.shots ?? 0, b: y?.shots ?? 0, aNote: x ? `${x.scored} scored` : '', bNote: y ? `${y.scored} scored` : '' };
-          }),
         ]} />
+        {boxes.length > 0 && (
+          <>
+            <div className="vs-heading">Where shots were taken (box number, attacking goal at the bottom)</div>
+            <div className="zones">
+              <ZoneGrid name={A.name} kind="shot" color={A.color} zones={Object.fromEntries(Object.entries(a.shotBoxes || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }]))} />
+              <ZoneGrid name={B.name} kind="shot" color={B.color} zones={Object.fromEntries(Object.entries(b.shotBoxes || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }]))} />
+            </div>
+          </>
+        )}
         <p className="takeaway">
           {A.name} {score(a)} ({a.total} pts) from {a.shots} shots, {B.name} {score(b)} ({b.total} pts) from {b.shots}. {better} made more of each shot.
         </p>

@@ -4,7 +4,7 @@ import { currentRole } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
 import { ShotMap, ShotLegend, hasShotMap } from '../report/ShotMap';
-import { GRID } from '../report/sections';
+import { ZoneGrid } from '../report/sections';
 import MergePlayer from './[id]/MergePlayer';
 
 
@@ -133,25 +133,22 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
 
       {(() => {
         // Shots by box, where the tagging records a box (no exact spot).
-        const boxes = {};
-        for (const g of games) for (const [z, n] of Object.entries(g.row?.boxes || {})) boxes[z] = (boxes[z] || 0) + n;
-        const tot = Object.values(boxes).reduce((a, b) => a + b, 0);
+        const zones = {};
+        for (const g of games) {
+          for (const [z, n] of Object.entries(g.row?.boxes || {})) (zones[z] ||= { n: 0, won: 0 }).n += n;
+          for (const [z, n] of Object.entries(g.row?.boxesScored || {})) (zones[z] ||= { n: 0, won: 0 }).won += n;
+        }
+        const tot = Object.values(zones).reduce((a, z) => a + z.n, 0);
         if (!tot) return null;
-        const max = Math.max(...Object.values(boxes));
+        const boxGames = games.filter((g) => Object.keys(g.row?.boxes || {}).length).length;
         return (
           <>
             <h2>Shots by box</h2>
             <div className="card">
-              <div className="zone-wrap" style={{ maxWidth: 360, margin: '0 auto' }}>
-                <div className="zone-grid">
-                  {GRID.flat().map((b) => (
-                    <div key={b} className="zone" style={boxes[b] ? { background: `color-mix(in srgb, #3b4f9e ${Math.round((0.15 + 0.6 * (boxes[b] / max)) * 100)}%, #fff)` } : undefined}>
-                      <span className="zone-no">{b}</span>{boxes[b] ? <b>{boxes[b]}</b> : null}
-                    </div>
-                  ))}
-                </div>
+              <div style={{ maxWidth: 380, margin: '0 auto' }}>
+                <ZoneGrid name={p.name} zones={zones} color="#3b4f9e" kind="shot" />
               </div>
-              <p className="muted small center">{tot} of {total.shots} shots have a box tagged.</p>
+              <p className="muted small center">Attacking goal at the bottom. {tot} shots with a box tagged, from {boxGames} of {games.length} game{games.length === 1 ? '' : 's'}.</p>
             </div>
           </>
         );

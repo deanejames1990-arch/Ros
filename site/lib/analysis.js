@@ -285,7 +285,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
     return (playerRows[tid][key.toLowerCase()] ||= {
       name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0, oneTried: 0, oneScored: 0,
       frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
-      tackles: 0, assists: 0, winbacks: 0, boxes: {}, twoTrackedGames: twoTracked ? 1 : 0,
+      tackles: 0, assists: 0, winbacks: 0, boxes: {}, boxesScored: {}, twoTrackedGames: twoTracked ? 1 : 0,
     });
   };
   const namesOf = (e) => {
@@ -314,7 +314,7 @@ export function analyseMatch({ events: raw = [], teams, match = null, period = '
       if (placed) { r.frees += 1; if (v) r.freesScored += 1; }
       if (!v && /wide/i.test(e.outcome || '')) r.wides += 1;
       const z = zoneOf(e);
-      if (z != null) r.boxes[z] = (r.boxes[z] || 0) + 1;
+      if (z != null) { r.boxes[z] = (r.boxes[z] || 0) + 1; if (v) r.boxesScored[z] = (r.boxesScored[z] || 0) + 1; }
     } else if (e.event_type === 'Poss' || e.event_type === 'Attack') {
       for (const n of names) { const r = prow(e.team_id, n); if (r) r[e.event_type === 'Poss' ? 'poss' : 'attacks'] += 1; }
     } else if (e.event_type === 'Kickout') {
@@ -426,9 +426,10 @@ export function combineSides(list) {
     for (const pl of s.players || []) {
       const k = pl.name.toLowerCase();
       const o = out.players[k];
-      if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes } }; continue; }
+      if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes }, boxesScored: { ...(pl.boxesScored || {}) } }; continue; }
       for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'twoTrackedGames', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
+      for (const [z, n] of Object.entries(pl.boxesScored || {})) o.boxesScored[z] = (o.boxesScored[z] || 0) + n;
     }
     for (const r of s.sources || []) {
       const o = (out.sources[r.source] ||= { source: r.source, shots: 0, scores: 0, points: 0 });
