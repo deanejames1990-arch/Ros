@@ -31,6 +31,8 @@ export default async function Manage({ searchParams }) {
       {searchParams.deleted && <p className="card check ok small">Game deleted.</p>}
       {searchParams.merged && <p className="card check ok small">Competitions merged.</p>}
 
+      <a href="/admin/people" className="card people-link"><b>People</b> <span className="muted small">Give each person their own access code, limit them to a grade, switch them off</span></a>
+
       <h2>Games</h2>
       <form method="get" className="search"><input name="q" defaultValue={searchParams.q || ''} placeholder="Filter by team, competition or date" /><button type="submit">Filter</button></form>
       <div className="wrap">

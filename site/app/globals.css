@@ -494,3 +494,25 @@ input.sheet-no{font:inherit;font-weight:800;padding:6px 2px;border:1px solid #cf
   .home-stats b{font-size:1.2rem}
   .home-hero h1{font-size:1.6rem}
 }
+/* ---- People ---------------------------------------------------------------- */
+.sql{background:#14203f;color:#e8ecf6;padding:12px;border-radius:8px;overflow:auto;font-size:.82rem;white-space:pre}
+.person-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:end}
+.person-form label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:.9rem}
+.person-form input:not([type=checkbox]),.person-form select{font:inherit;padding:9px;border:1px solid #cfd6e4;border-radius:8px;background:#fff}
+.grade-picks{border:1px solid #cfd6e4;border-radius:8px;padding:6px 10px;display:flex;gap:12px;flex-wrap:wrap;margin:0}
+.grade-picks legend{font-weight:600;font-size:.9rem;padding:0 4px}
+.grade-picks .tick{flex-direction:row;align-items:center;gap:6px;font-weight:500}
+.person-foot{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.person-foot .danger{margin-left:auto}
+.people-list{display:grid;gap:8px}
+.person{margin:0}
+.person.off{opacity:.65}
+.person-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.person-btns{display:flex;gap:6px;flex-wrap:wrap}
+.person-btns button{background:#eef1f7;padding:7px 12px;font-size:.85rem}
+.badge-off{font-size:.7rem;font-weight:700;background:#f6dede;color:#9b2c2c;border-radius:20px;padding:2px 8px}
+.code-box{border:2px solid var(--gold);display:grid;gap:8px}
+.the-code{font-size:1.8rem;font-weight:800;letter-spacing:.08em;margin:0;color:var(--g)}
+.code-box textarea{font:inherit;padding:8px;border:1px solid #cfd6e4;border-radius:8px;width:100%}
+.code-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.people-link{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;text-decoration:none;color:var(--dk);border-left:5px solid var(--gold)}

@@ -1,4 +1,5 @@
 import { db, MATCH_SELECT } from '../../lib/db';
+import { currentAccess, gradeOk } from '../../lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Teams · Roscommon GAA Stats' };
@@ -8,7 +9,9 @@ const gOrder = (g) => ORDER.indexOf(g) + 1 || 99;
 
 // Every county with games on the site, each linking to its combined report.
 export default async function Teams() {
-  const { data: matches } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(2000);
+  const access = await currentAccess();
+  const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(2000);
+  const matches = (all || []).filter((m) => gradeOk(access, m.competitions?.grade));
   const teams = {};
   for (const m of matches || []) {
     for (const t of [m.team1, m.team2]) {

@@ -1,6 +1,7 @@
 import { db, MATCH_SELECT } from '../../../lib/db';
 import { score } from '../../components';
 import StartForm from './StartForm';
+import { currentAccess, gradeOk } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Live tagger · Roscommon GAA Stats' };
@@ -11,7 +12,8 @@ export default async function LivePage() {
     db.from('competitions').select('id,name,grade,seasons(year)').order('id', { ascending: false }),
     db.from('matches').select(MATCH_SELECT).like('match_code', 'LIVE-%').order('match_date', { ascending: false }).limit(20),
   ]);
-  const competitions = (comps || [])
+  const access = await currentAccess();
+  const competitions = (comps || []).filter((c) => gradeOk(access, c.grade))
     .map((c) => ({ id: c.id, name: c.name, grade: c.grade, year: c.seasons?.year }))
     .sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name));
   return (
@@ -21,11 +23,11 @@ export default async function LivePage() {
         Tag a game as it happens on a phone or tablet: possessions, shots with where they were taken, kick-outs with the box they landed in.
         The quarter and half-time numbers are ready the moment you need them, and the game goes onto the site as you tag.
       </p>
-      {games?.length > 0 && (
+      {(games || []).filter((m) => gradeOk(access, m.competitions?.grade)).length > 0 && (
         <>
           <h2>Games tagged here</h2>
           <div className="live-list">
-            {games.map((m) => (
+            {games.filter((m) => gradeOk(access, m.competitions?.grade)).map((m) => (
               <a key={m.id} className="card game" href={`/admin/live/${m.id}`}>
                 <span className="game-main"><b>{m.team1.name} v {m.team2.name}</b>
                   <span className="num">{score(m.team1_goals, m.team1_points)} – {score(m.team2_goals, m.team2_points)}</span></span>

@@ -3,6 +3,7 @@ import { db, MATCH_SELECT, loadEvents } from '../../../../lib/db';
 import { isLiveCode, isFinishedCode } from '../../../../lib/live';
 import { sheetData } from '../../../../lib/sheets-data';
 import Tagger from './Tagger';
+import { currentAccess, gradeOk } from '../../../../lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Live tagger · Roscommon GAA Stats' };
@@ -10,6 +11,7 @@ export const metadata = { title: 'Live tagger · Roscommon GAA Stats' };
 export default async function LiveGame({ params }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', Number(params.id)).single();
   if (!m) notFound();
+  if (!gradeOk(await currentAccess(), m.competitions?.grade)) notFound();
   if (!isLiveCode(m.match_code)) {
     return <p className="card">This game was imported from a file, so it can’t be tagged live. <a href={`/match/${m.id}`}>Open the dashboard</a>.</p>;
   }

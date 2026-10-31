@@ -2,7 +2,7 @@ import { db, MATCH_SELECT, loadEvents } from '../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../lib/analysis';
 import { nameEvents } from '../lib/players';
 import { isLiveNow } from '../lib/live';
-import { currentRole } from '../lib/session';
+import { currentAccess, gradeOk } from '../lib/session';
 import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
@@ -18,10 +18,12 @@ const avg = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.leng
 
 // Home: where to go, how the season is going, and how it's trending.
 export default async function Home({ searchParams }) {
-  const role = await currentRole();
+  const access = await currentAccess();
+  const role = access?.role;
   const admin = role === 'admin';
   const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: true });
-  const games = all || [];
+  // Only the grades this person can see.
+  const games = (all || []).filter((m) => gradeOk(access, m.competitions?.grade));
   const live = games.filter(isLiveNow);
   const ours = games.filter((m) => US.test(m.team1.name) || US.test(m.team2.name));
 
@@ -72,8 +74,10 @@ export default async function Home({ searchParams }) {
     { href: '/games', t: 'Games', d: `${games.length} games: Roscommon and opposition, by season and competition` },
     { href: '/teams', t: 'Teams', d: 'Every county on the site: opposition reports and squads' },
     { href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, t: 'Roscommon report', d: `${grade} ${year || ''}: kick-outs, shooting, turnovers, players` },
-    ...(admin ? [
+    ...(admin || role === 'tagger' ? [
       { href: '/admin/live', t: 'Live tagger', d: 'Tag a game as it happens, with quarter and half-time numbers', admin: true },
+    ] : []),
+    ...(admin ? [
       { href: '/admin/import', t: 'Add game', d: 'Load a Nacsport or Sportscode file', admin: true },
       { href: '/admin', t: 'Manage', d: 'Edit games, team sheets and competitions', admin: true },
     ] : []),

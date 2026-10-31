@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
-import { currentRole } from '../../../lib/session';
+import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from '../../../lib/analysis';
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
@@ -20,6 +20,7 @@ const OPP = '#c4572a'; // opposition burnt orange
 export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();
   if (!m) notFound();
+  if (!gradeOk(await currentAccess(), m.competitions?.grade)) notFound();
   const role = await currentRole();
   // Underage names are hidden from viewers; admins see them.
   const showNames = m.competitions.show_player_names !== false || role === 'admin';
@@ -78,7 +79,7 @@ export default async function Match({ params, searchParams }) {
     <>
       {liveNow && <LiveRefresh />}
       <p className="muted">
-        {role === 'admin' && <span className="no-print">{isLiveCode(m.match_code) && <><a href={`/admin/live/${m.id}`}>Open in live tagger</a> · </>}<a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
+        {(role === 'admin' || role === 'tagger') && isLiveCode(m.match_code) && <span className="no-print"><a href={`/admin/live/${m.id}`}>Open in live tagger</a> · </span>}{role === 'admin' && <span className="no-print"><a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
         <a href="/games">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
       </p>
       <div className="scoreline" data-export-title={`${A.name} ${score(m.team1_goals, m.team1_points)} – ${score(m.team2_goals, m.team2_points)} ${B.name} · ${m.competitions.name} ${m.competitions.seasons.year}${m.stage ? ` · ${m.stage}` : ''} · ${m.match_date}`}>

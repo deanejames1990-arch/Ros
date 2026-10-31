@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '../../../lib/db';
-import { requireAdmin } from '../../../lib/session';
+import { requireTagger } from '../../../lib/session';
 import { syncAppearanceScores } from '../sheet-actions';
 import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow } from '../../../lib/live';
 
@@ -61,7 +61,7 @@ async function insertWithSource(table, rows, single) {
 export async function startLiveGame(_prev, form) {
   let id;
   try {
-    await requireAdmin();
+    await requireTagger();
     const date = clean(form.get('date'));
     if (!date) throw new Error('Please enter the date.');
     const year = Number(date.slice(0, 4));
@@ -71,6 +71,8 @@ export async function startLiveGame(_prev, form) {
     const [a, b] = await Promise.all([findOrCreateTeam(us), findOrCreateTeam(them)]);
     if (a === b) throw new Error('The two teams are the same.');
     const competition_id = await competitionFor(form, year);
+    const { data: cg } = await db.from('competitions').select('grade').eq('id', competition_id).single();
+    await requireTagger(cg?.grade || '');
     const home = form.get('home') === 'them';
     const halfLen = Number(form.get('halfLen')) || 35;
     const row = {
@@ -96,11 +98,11 @@ export async function startLiveGame(_prev, form) {
 // closes the game (no longer shown as live).
 export async function saveLiveGame(matchId, events, opts = {}) {
   try {
-    await requireAdmin();
     const { data: m, error } = await db.from('matches')
-      .select('id, match_code, team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
+      .select('id, match_code, competitions(grade), team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
       .eq('id', Number(matchId)).single();
     if (error || !m) throw new Error('Game not found.');
+    await requireTagger(m.competitions?.grade || '');
     if (!isLiveCode(m.match_code)) throw new Error('This game was not started in the live tagger.');
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const rows = (events || []).map((e) => ({ match_id: m.id, ...toRow(e, teams) }));

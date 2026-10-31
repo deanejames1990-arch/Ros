@@ -8,9 +8,10 @@ export default function Login({ searchParams }) {
     <div className="login card">
       <img src="/crest.png" alt="" className="login-crest" />
       <h1>Log in</h1>
-      {searchParams.need === 'admin'
-        ? <p className="check warn small">That page needs the admin password.</p>
-        : <p className="muted">Use the viewer password to see the stats, or the admin password to add and manage games.</p>}
+      {searchParams.removed ? <p className="check warn small">Your access has been changed or removed. Log in again, or ask James for a new code.</p>
+        : searchParams.need === 'admin' ? <p className="check warn small">That page needs an admin login.</p>
+        : searchParams.need === 'tagger' ? <p className="check warn small">The live tagger needs a tagger or admin login.</p>
+        : <p className="muted">Enter your personal access code (like ABCD-EFGH-JKLM), or the shared password.</p>}
       <LoginForm next={next} />
     </div>
   );

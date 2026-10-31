@@ -2,15 +2,30 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { COOKIE, makeToken, roleFor } from '../../lib/auth';
+import { COOKIE, makeToken, roleFor, hashCode, normCode } from '../../lib/auth';
+import { db } from '../../lib/db';
 
+// One box: a personal access code, or one of the shared passwords.
 export async function login(_prev, form) {
-  const role = roleFor(String(form.get('password') || ''));
-  if (!role) return { error: 'That password isn’t right.' };
-  const { token, maxAge } = await makeToken(role);
+  const typed = String(form.get('password') || '').trim();
+  let role = roleFor(typed);
+  let uid = 0;
+  if (!role && normCode(typed).length === 12) {
+    const { data } = await db.from('site_users').select('id, role, active').eq('code_hash', await hashCode(typed)).limit(1);
+    const u = data?.[0];
+    if (u?.active) {
+      role = u.role; uid = u.id;
+      await db.from('site_users').update({ last_seen: new Date().toISOString() }).eq('id', u.id);
+    } else if (u) {
+      return { error: 'That access code has been switched off. Ask James for a new one.' };
+    }
+  }
+  if (!role) return { error: 'That code or password isn’t right.' };
+  const { token, maxAge } = await makeToken(role, uid);
   cookies().set(COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge });
   let next = String(form.get('next') || '/');
   if (!next.startsWith('/') || next.startsWith('//')) next = '/';
   if (role === 'viewer' && next.startsWith('/admin')) next = '/';
+  if (role === 'tagger' && next.startsWith('/admin') && !next.startsWith('/admin/live')) next = '/admin/live';
   redirect(next);
 }

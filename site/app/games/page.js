@@ -2,6 +2,7 @@ import { db, MATCH_SELECT } from '../../lib/db';
 import { compType } from '../../lib/analysis';
 import { score } from '../components';
 import { isLiveNow } from '../../lib/live';
+import { currentAccess, gradeOk } from '../../lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,8 @@ export default async function Home({ searchParams }) {
   try {
     const { data, error } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(500);
     if (error) problem = error.message;
-    matches = data || [];
+    const access = await currentAccess();
+    matches = (data || []).filter((m) => gradeOk(access, m.competitions?.grade));
   } catch (e) {
     problem = String(e.message || e);
   }

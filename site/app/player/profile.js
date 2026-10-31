@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, loadEvents, hiddenPlayerIds } from '../../lib/db';
-import { currentRole } from '../../lib/session';
+import { currentRole, currentAccess, gradeOk } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
 import { ShotMap, ShotLegend, hasShotMap } from '../report/ShotMap';
@@ -21,6 +21,7 @@ const MATCH_COLS = 'id, match_date, stage, team1_id, team2_id, team1_goals, team
 // ({ id, name }) or just a name from the tags ({ id: null, name }).
 export default async function Profile({ p, teamIds: givenTeams = [] }) {
   const role = await currentRole();
+  const access = await currentAccess();
   const admin = role === 'admin';
   const hidden = p.id ? (await hiddenPlayerIds([p.id])).size > 0 : false;
   if (hidden && !admin) notFound();
@@ -41,6 +42,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
   const list = [...sheetGames, ...extra]
     // Underage games: names are for admins only.
     .filter((a) => admin || a.matches.competitions?.show_player_names !== false)
+    .filter((a) => gradeOk(access, a.matches.competitions?.grade))
     .sort((a, b) => b.matches.match_date.localeCompare(a.matches.match_date));
 
   // Each game: this player's row from the tags, named from that game's team sheets.

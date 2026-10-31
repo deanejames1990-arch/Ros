@@ -1,7 +1,7 @@
 'use server';
 
 import { db, loadEvents } from '../../lib/db';
-import { requireAdmin } from '../../lib/session';
+import { requireAdmin, requireTagger } from '../../lib/session';
 import { scoresFromTags } from '../../lib/players';
 
 const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
@@ -30,8 +30,9 @@ export async function syncAppearanceScores(matchId) {
 // that name who has played for this team before, else a new player.
 export async function saveTeamSheet(matchId, teamId, entries) {
   try {
-    await requireAdmin();
     const mid = Number(matchId), tid = Number(teamId);
+    const { data: gm } = await db.from('matches').select('competitions(grade)').eq('id', mid).single();
+    await requireTagger(gm?.competitions?.grade || '');
     const list = (entries || []).map((e) => ({ no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null })).filter((e) => e.name);
     const seen = new Set();
     for (const e of list) {

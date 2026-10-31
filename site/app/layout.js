@@ -1,11 +1,12 @@
 import './globals.css';
-import { currentRole } from '../lib/session';
+import { currentAccess } from '../lib/session';
 import { authEnabled } from '../lib/auth';
 
 export const metadata = { title: 'Roscommon GAA Stats' };
 
 export default async function RootLayout({ children }) {
-  const role = await currentRole();
+  const access = await currentAccess();
+  const role = access?.role;
   return (
     <html lang="en">
       <body>
@@ -15,10 +16,10 @@ export default async function RootLayout({ children }) {
             <nav className="nav-links">
               <a className="nav" href="/games">Games</a>
               <a className="nav" href="/teams">Teams</a>
-              {role === 'admin' && <a className="nav" href="/admin/live">Live tagger</a>}
+              {(role === 'admin' || role === 'tagger') && <a className="nav" href="/admin/live">Live tagger</a>}
               {role === 'admin' && <a className="nav" href="/admin/import">Add game</a>}
               {role === 'admin' && <a className="nav" href="/admin">Manage</a>}
-              {authEnabled() && <a className="nav" href="/logout">Log out</a>}
+              {authEnabled() && <a className="nav" href="/logout" title={access?.name ? `Logged in as ${access.name}` : undefined}>Log out{access?.name ? ` (${access.name.split(' ')[0]})` : ''}</a>}
             </nav>
           )}
         </header>

@@ -6,7 +6,7 @@ import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
 import { nameEvents } from '../../../lib/players';
-import { currentRole } from '../../../lib/session';
+import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +20,11 @@ export default async function TeamReport({ params, searchParams }) {
   const ids = teams.map((t) => t.id);
   const teamName = teams[0].name;
 
-  const { data: all } = await db.from('matches').select(MATCH_SELECT)
+  const access = await currentAccess();
+  const { data: allGames } = await db.from('matches').select(MATCH_SELECT)
     .or(`team1_id.in.(${ids.join(',')}),team2_id.in.(${ids.join(',')})`)
     .order('match_date', { ascending: false });
+  const all = (allGames || []).filter((m) => gradeOk(access, m.competitions?.grade));
   // Grades this team has games in, senior first. Senior and underage numbers
   // shouldn't be mixed, so open on Senior (or the only grade) unless asked.
   const ORDER = ['Senior', 'Junior', 'U21', 'U20', 'Minor', 'U17', 'Club'];
