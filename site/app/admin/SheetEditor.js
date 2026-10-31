@@ -77,6 +77,13 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
     }));
     setPaste('');
   };
+  // Names in this game's tags that aren't on the sheet yet (imported files).
+  const onSheet = new Set(entries.map((e) => String(e.name).trim().toLowerCase()));
+  const missing = (info?.tagNames || []).filter((n) => !onSheet.has(n.toLowerCase()));
+  const addFromTags = () => change([...entries, ...missing.map((n) => {
+    const p = byName.get(n.toLowerCase());
+    return { no: null, name: p ? p.name : n, id: p ? p.id : null };
+  })]);
   const inSquad = (name) => !name || byName.has(String(name).trim().toLowerCase());
 
   return (
@@ -91,6 +98,9 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
       <div className="sheet-tools">
         {info?.last?.length > 0 && (
           <button type="button" onClick={useLast}>Use last sheet{info.lastDate ? ` (${new Date(info.lastDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })})` : ''}</button>
+        )}
+        {missing.length > 0 && (
+          <button type="button" onClick={addFromTags} title={missing.join(', ')}>Add {missing.length} name{missing.length === 1 ? '' : 's'} from the tags</button>
         )}
         {entries.length > 0 && <button type="button" onClick={() => change([])}>Clear</button>}
       </div>

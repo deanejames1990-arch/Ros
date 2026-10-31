@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
-import { db, MATCH_SELECT } from '../../../../lib/db';
+import { db, MATCH_SELECT, loadEvents } from '../../../../lib/db';
+import { analyseMatch } from '../../../../lib/analysis';
+import { nameEvents } from '../../../../lib/players';
 import { GameForm, DeleteGame } from '../../forms';
 import { sheetData } from '../../../../lib/sheets-data';
 import SheetEditor from '../../SheetEditor';
@@ -20,7 +22,18 @@ export default async function EditGame({ params }) {
   const label = `${g.team1.name} v ${g.team2.name} (${g.match_date})`;
   const sides = [{ id: g.team1_id, name: g.team1.name, color: '#3b4f9e' }, { id: g.team2_id, name: g.team2.name, color: '#c4572a' }];
   if (/roscommon/i.test(sides[1].name)) { sides.reverse(); sides[0].color = '#3b4f9e'; sides[1].color = '#c4572a'; }
-  const sheets = await sheetData(g.id, sides);
+  const [sheets, raw, { data: apps }] = await Promise.all([
+    sheetData(g.id, sides),
+    loadEvents(g.id),
+    db.from('appearances').select('team_id, jersey_no, players(name)').eq('match_id', g.id),
+  ]);
+  // Names already in the tags, per team, for "Add names from the tags".
+  if (raw.length) {
+    const r = analyseMatch({ events: nameEvents(raw, apps || [], sides), teams: sides });
+    for (const t of sides) {
+      sheets[t.id].tagNames = (r.byTeam[t.id]?.players || []).map((p) => p.name).filter((n) => !/^#?\d+$/.test(n));
+    }
+  }
   return (
     <>
       <p className="muted"><a href="/admin">Manage</a> · <a href={`/match/${g.id}`}>View game</a></p>
