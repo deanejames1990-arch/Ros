@@ -103,9 +103,14 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
         {sheetGames.length > 0 && <div><b className="num">{total.starts || 0}</b><span>starts</span></div>}
         <div><b className="num">{total.goals || 0}-{(total.points || 0) - 3 * (total.goals || 0)}</b><span>scored</span></div>
         <div><b className="num">{total.shots ? `${Math.round((100 * total.scores) / total.shots)}%` : '–'}</b><span>shot conversion</span></div>
-        <div><b className="num">{total.freesWon || 0}</b><span>frees won</span></div>
-        <div><b className="num">{total.winbacks || 0}</b><span>turnovers won</span></div>
-        <div><b className="num">{total.koWon || 0}</b><span>kick-outs won</span></div>
+        {total.games > 0 && total.points > 0 && <div><b className="num">{(total.points / total.games).toFixed(1)}</b><span>points a game</span></div>}
+        {(total.twoTried || total.twoScored) > 0 && <div><b className="num">{total.twoTried ? `${total.twoScored}/${total.twoTried}` : total.twoScored}</b><span>2-pointers{total.twoTried ? ' (scored/tried)' : ''}</span></div>}
+        {total.frees > 0 && <div><b className="num">{total.freesScored}/{total.frees}</b><span>frees, 45s, marks</span></div>}
+        {total.shots > 0 && <div><b className="num">{total.wides || 0}</b><span>wides</span></div>}
+        {/* Only where the tagging records them: blank otherwise rather than 0. */}
+        {total.freesWon > 0 && <div><b className="num">{total.freesWon}</b><span>frees won</span></div>}
+        {total.winbacks > 0 && <div><b className="num">{total.winbacks}</b><span>turnovers won</span></div>}
+        {total.koWon > 0 && <div><b className="num">{total.koWon}</b><span>kick-outs won</span></div>}
       </div>
 
       <h2>Season by season</h2>
