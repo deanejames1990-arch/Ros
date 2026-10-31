@@ -278,3 +278,10 @@ button.danger{background:#9b2c2c;color:#fff}
   .compare th{letter-spacing:.02em}
   .compare .long{display:none}.compare .short{display:inline}
 }
+.game-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.game-row .card.game{margin:4px 0}
+.ex-btn{font:600 .78rem system-ui,sans-serif;color:var(--mut);text-decoration:none;border:1px solid #cbd3e3;border-radius:8px;padding:6px 10px;background:#fff;white-space:nowrap}
+.ex-btn:hover{color:var(--dk);border-color:var(--g)}
+.ex-btn.on{background:var(--dk);color:#fff;border-color:var(--dk)}
+.game-row.excluded .card.game{opacity:.45;text-decoration:line-through;text-decoration-color:#b3bac9}
+@media print{.game-row.excluded{display:none}}

@@ -49,7 +49,11 @@ export default async function TeamReport({ params, searchParams }) {
     const oppId = mineId === m.team1_id ? m.team2_id : m.team1_id;
     return { m, tagged: true, mine: r.byTeam[mineId], opp: r.byTeam[oppId], oppName: t.find((x) => x.id === oppId).name };
   }));
-  const done = analysed.filter((d) => !comp || compType(d.m.competitions?.name) === comp);
+  // Games left out of the numbers (?x=12,15), e.g. a freak win or loss.
+  const excluded = new Set(String(searchParams.x || '').split(',').map(Number).filter(Boolean));
+  const listed = analysed.filter((d) => !comp || compType(d.m.competitions?.name) === comp);
+  const done = listed.filter((d) => !excluded.has(d.m.id));
+  const nExcluded = listed.length - done.length;
   const games = done.map((d) => d.m);
   const tagged = done.filter((d) => d.tagged);
   const a = combineSides(tagged.map((d) => d.mine));
@@ -73,9 +77,11 @@ export default async function TeamReport({ params, searchParams }) {
     // Changing grade goes back to that grade's latest season.
     const yr = o.year ?? (o.grade !== undefined ? null : year || 'all');
     const cp = o.comp ?? comp;
+    const xs = o.x ?? [...excluded];
     if (gr && gr !== grades[0]) p.set('grade', gr);
     if (yr) p.set('year', yr);
     if (cp) p.set('comp', cp.toLowerCase());
+    if (xs.length) p.set('x', [...xs].sort((a, b) => a - b).join(','));
     const s = p.toString();
     return `/team/${encodeURIComponent(teamName)}${s ? `?${s}` : ''}`;
   };
@@ -83,7 +89,7 @@ export default async function TeamReport({ params, searchParams }) {
   return (
     <>
       <p className="muted"><a href="/">All games</a></p>
-      <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'}${comp ? ` ${comp}` : ''} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
+      <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'}${comp ? ` ${comp}` : ''}${nExcluded ? ` (${nExcluded} excluded)` : ''} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
         <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}{comp ? <span className="muted"> · {comp}</span> : ''}</h1>
         <PrintButton />
       </div>
@@ -111,14 +117,16 @@ export default async function TeamReport({ params, searchParams }) {
       </nav>
       <p className="muted">
         {tagged.length} tagged game{tagged.length === 1 ? '' : 's'} combined
-        {games.length > tagged.length && ` · ${games.length - tagged.length} more without tags`}. Numbers are totals across the games; rates are worked out from the totals.
+        {games.length > tagged.length && ` · ${games.length - tagged.length} more without tags`}
+        {nExcluded > 0 && <> · <b>{nExcluded} excluded</b> (<a href={link({ x: [] })}>include all</a>)</>}
+        . Numbers are totals across the games; rates are worked out from the totals. Use Exclude to leave a game out.
       </p>
 
       {!comp && types.length > 1 && (
         <CompareTypes
           name={teamName}
           rows={['League', 'Championship'].map((ty) => {
-            const ds = analysed.filter((d) => compType(d.m.competitions?.name) === ty);
+            const ds = analysed.filter((d) => compType(d.m.competitions?.name) === ty && !excluded.has(d.m.id));
             const tg = ds.filter((d) => d.tagged);
             const rs = ds.map((d) => result(d.m).res);
             const pts = ds.map((d) => {
@@ -142,14 +150,21 @@ export default async function TeamReport({ params, searchParams }) {
       )}
 
       <div className="game-strip">
-        {done.map(({ m, tagged: t }) => {
+        {listed.map(({ m, tagged: t }) => {
           const r = result(m);
+          const out = excluded.has(m.id);
+          const toggled = out ? [...excluded].filter((id) => id !== m.id) : [...excluded, m.id];
           return (
-            <a key={m.id} href={`/match/${m.id}`} className={`card game ${t ? '' : 'untagged'}`}>
+            <div key={m.id} className={`game-row ${out ? 'excluded' : ''}`}>
+            <a href={`/match/${m.id}`} className={`card game ${t ? '' : 'untagged'}`}>
               <span className={`badge ${r.res}`}>{r.res}</span>
               <span className="game-main"><b>v {r.opp}</b><span className="num">{r.line}</span></span>
-              <span className="muted small game-meta">{!grade && m.competitions?.grade ? `${m.competitions.grade} · ` : ''}{!year && m.competitions?.seasons?.year ? `${m.competitions.seasons.year} · ` : ''}{!comp && types.length > 1 ? `${compType(m.competitions?.name)} · ` : ''}{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}</span>
+              <span className="muted small game-meta">{!grade && m.competitions?.grade ? `${m.competitions.grade} · ` : ''}{!year && m.competitions?.seasons?.year ? `${m.competitions.seasons.year} · ` : ''}{!comp && types.length > 1 ? `${compType(m.competitions?.name)} · ` : ''}{m.stage ? `${m.stage} · ` : ''}{new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}{t ? '' : ' · no tags'}{out ? ' · excluded' : ''}</span>
             </a>
+            <a className={`ex-btn no-export ${out ? 'on' : ''}`} href={link({ x: toggled })} title={out ? 'Put this game back into the numbers' : 'Leave this game out of the numbers'}>
+              {out ? 'Include' : 'Exclude'}
+            </a>
+            </div>
           );
         })}
       </div>
