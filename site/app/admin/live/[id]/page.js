@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../../lib/db';
-import { isLiveCode } from '../../../../lib/live';
+import { isLiveCode, isFinishedCode } from '../../../../lib/live';
 import Tagger from './Tagger';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,8 @@ export default async function LiveGame({ params }) {
   return (
     <Tagger
       match={{ id: m.id, title: `${m.team1.name} v ${m.team2.name}`, competition: m.competitions?.name || '', date: m.match_date, halfLen,
-        hideNames: m.competitions?.show_player_names === false }}
+        hideNames: m.competitions?.show_player_names === false, finished: isFinishedCode(m.match_code),
+        official: { [m.team1_id]: { g: m.team1_goals, p: m.team1_points }, [m.team2_id]: { g: m.team2_goals, p: m.team2_points } } }}
       teams={teams}
       saved={events}
     />

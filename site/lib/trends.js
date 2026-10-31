@@ -149,11 +149,60 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
     }
   }
 
+  // ---- Players doing the damage ------------------------------------------------------
+  // Everything a player did that cost the other team: scores, frees won,
+  // turnovers won, and the other team's kick-outs won.
+  const players = Object.fromEntries(teams.map((t) => [t.id, {}]));
+  const prow = (tid, who) => {
+    if (!who || !players[tid]) return null;
+    return (players[tid][who] ||= { who, pts: 0, goals: 0, scores: 0, shots: 0, freesWon: 0, toWon: 0, koWon: 0, ownKo: 0, recent: 0, recentPts: 0 });
+  };
+  for (const e of all) {
+    const recentE = at(e) >= from;
+    if (isShot(e)) {
+      const r = prow(e.team_id, lbl(e, 'Players') || e.player_no);
+      if (!r) continue;
+      const v = shotValue(e);
+      r.shots += 1; r.pts += v; if (v) r.scores += 1; if (v === 3) r.goals += 1;
+      if (v && recentE) { r.recent += 1; r.recentPts += v; }
+    } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy')) {
+      const r = prow(other(e.team_id), lbl(e, 'FreeWonBy'));
+      if (r) { r.freesWon += 1; if (recentE) r.recent += 1; }
+    } else if (e.event_type === 'Turnover' && lbl(e, 'WonBackBy')) {
+      for (const who of String(lbl(e, 'WonBackBy')).split(',').map((x) => x.trim()).filter(Boolean)) {
+        const r = prow(other(e.team_id), who);
+        if (r) { r.toWon += 1; if (recentE) r.recent += 1; }
+      }
+    } else if (e.event_type === 'Kickout' && lbl(e, 'Players')) {
+      const k = kos.find((x) => x.e === e);
+      if (!k) continue;
+      const winner = k.won ? e.team_id : other(e.team_id);
+      const r = prow(winner, lbl(e, 'Players'));
+      if (!r) continue;
+      if (k.won) r.ownKo += 1; else { r.koWon += 1; if (recentE) r.recent += 1; }
+    }
+  }
+  const danger = {};
+  for (const t of teams) {
+    const opp = name(other(t.id));
+    danger[t.id] = Object.values(players[t.id])
+      .map((r) => ({ ...r, line: sc(r.pts, r.goals), hurt: r.scores + r.freesWon + r.toWon + r.koWon }))
+      .filter((r) => r.hurt > 0)
+      .sort((a, b) => b.hurt - a.hurt || b.pts - a.pts || b.recent - a.recent);
+    for (const r of danger[t.id]) {
+      const w = t.id === usId ? 1 : 3;
+      if (r.koWon >= 2) add(t.id, true, `${name(t.id)} ${r.who} has won ${r.koWon} of ${opp}’s kick-outs`, w);
+      if (r.freesWon >= 3) add(t.id, true, `${name(t.id)} ${r.who} has won ${r.freesWon} frees`, w);
+      if (r.toWon >= 2) add(t.id, true, `${name(t.id)} ${r.who} has turned ${opp} over ${r.toWon} times`, w);
+    }
+  }
+
   items.sort((a, b) => b.weight - a.weight);
   return {
     now, nowLabel: clock(now), windowMin,
     window: win.map((w) => ({ ...w, line: sc(w.pts, w.goals) })),
     items: items.map((i) => ({ ...i, tone: tone(i.team, i.good), color: i.team })),
     blocks,
+    danger,
   };
 }

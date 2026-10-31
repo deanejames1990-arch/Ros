@@ -12,6 +12,11 @@
 
 export const LIVE_PREFIX = 'LIVE-';
 export const isLiveCode = (code) => String(code || '').startsWith(LIVE_PREFIX);
+// Finished live games carry "-F" on the end of their code.
+export const isFinishedCode = (code) => isLiveCode(code) && String(code).endsWith('-F');
+// Still being tagged: a live game, not finished, dated within about a day of now.
+export const isLiveNow = (m) => isLiveCode(m.match_code) && !isFinishedCode(m.match_code)
+  && Math.abs(Date.now() - new Date(m.match_date).getTime()) < 36 * 3600 * 1000;
 
 // Half-pitch in metres: goal at the top centre (45, 0), 90 m wide.
 export const PITCH = { w: 90, d: 50, goalX: 45, arc: 40 };
@@ -83,6 +88,12 @@ export function toRow(ev, teams) {
     case 'foul':
       row.event_type = 'Foul';
       if (ev.third) labels.PitchArea = THIRD[ev.third];
+      // Who won the free (a player on the other team).
+      if (ev.player) {
+        labels.FreeWonBy = ev.player.name || `#${ev.player.no}`;
+        labels.Players = labels.FreeWonBy;
+        if (ev.player.no) labels.Jersey = ev.player.no;
+      }
       break;
     case 'card':
       row.event_type = 'Card';
@@ -113,7 +124,7 @@ export function fromRow(r, teams) {
       return { ...ev, kind: 'ko', won: winnerIsKicker, how: /break/i.test(r.outcome || '') ? 'Break' : 'Clean', box, player };
     }
     case 'Turnover': return { ...ev, team: other, kind: 'to', third: third(l.PitchArea) && { Def: 'Att', Mid: 'Mid', Att: 'Def' }[third(l.PitchArea)], player: l.WonBackBy ? { no: Number(l.Jersey) || Number(String(l.WonBackBy).replace('#', '')) || null, name: named(l.WonBackBy) } : null };
-    case 'Foul': return { ...ev, kind: 'foul', third: third(l.PitchArea) };
+    case 'Foul': return { ...ev, kind: 'foul', third: third(l.PitchArea), player: l.FreeWonBy ? { no: Number(l.Jersey) || Number(String(l.FreeWonBy).replace('#', '')) || null, name: named(l.FreeWonBy) } : null };
     case 'Card': return { ...ev, kind: 'card', outcome: r.outcome, player };
     default:
       if (/^shot/i.test(r.event_type || '')) {

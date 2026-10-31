@@ -29,7 +29,7 @@ function describe(e, teams) {
     case 'shot': return `${t} ${e.type && e.type !== 'Play' ? `${e.type.toLowerCase()} ` : ''}shot: ${e.outcome === '2 Point' ? '2-pointer' : e.outcome}${who}`;
     case 'ko': return `${t} kick-out ${e.won ? 'won' : 'lost'} ${e.how === 'Break' ? 'on break' : 'clean'}${e.box != null ? ` · box ${e.box}` : ''}${who}`;
     case 'to': return `${t} turnover won${e.third ? ` · ${e.third.toLowerCase()}` : ''}${who}`;
-    case 'foul': return `${t} free conceded${e.third ? ` · ${e.third.toLowerCase()}` : ''}`;
+    case 'foul': return `${t} free conceded${e.third ? ` · ${e.third.toLowerCase()}` : ''}${e.player ? ` · won by ${e.player.name || `#${e.player.no}`}` : ''}`;
     case 'card': return `${t} ${String(e.outcome).toLowerCase()} card${who}`;
     default: return e.kind;
   }
@@ -104,6 +104,9 @@ export default function Tagger({ match, teams, saved }) {
   const [sync, setSync] = useState({ state: 'saved', dirty: 0, msg: '' });
   const [, tick] = useState(0);
   const savingRef = useRef(false);
+  const [finished, setFinished] = useState(Boolean(match.finished));
+  const [finishing, setFinishing] = useState(null); // { [teamId]: { g, p } } while the finish panel is open
+  const [finishMsg, setFinishMsg] = useState('');
 
   // Load: this device's copy if it has one, otherwise what's on the site.
   useEffect(() => {
@@ -118,7 +121,7 @@ export default function Tagger({ match, teams, saved }) {
         .sort((a, b) => a.half - b.half || a.sec - b.sec);
       setEvents(evs);
       const last = evs[evs.length - 1];
-      if (last) setClock({ half: last.half, running: false, base: last.sec, since: 0 });
+      if (last) setClock({ half: last.half, running: false, base: last.sec, since: 0, ended: Boolean(match.finished) });
     }
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,14 +227,44 @@ export default function Tagger({ match, teams, saved }) {
     if (clock.half === 0) return ['Throw-in: start 1st half', () => setClock({ half: 1, running: true, base: 0, since: Date.now() })];
     if (clock.half === 1 && clock.running) return ['Half-time', () => { setClock({ ...clock, running: false, base: secs }); setView('report'); }];
     if (clock.half === 1) return ['Start 2nd half', () => setClock({ half: 2, running: true, base: 0, since: Date.now() })];
-    if (clock.running) return ['Full time', () => { setClock({ ...clock, running: false, base: secs, ended: true }); setView('report'); }];
-    return ['Restart clock', () => setClock({ ...clock, running: true, since: Date.now(), ended: false })];
+    if (clock.running) return ['Full time', () => { setClock({ ...clock, running: false, base: secs, ended: true }); openFinish(); }];
+    if (finished) return ['Finished', () => setView('report')];
+    return ['Finish game', () => openFinish()];
   };
   const nudge = (d) => setClock((c) => {
     const now = c.base + (c.running ? (Date.now() - c.since) / 1000 : 0);
     return { ...c, base: Math.max(0, now + d), since: Date.now() };
   });
   const [cbLabel, cbGo] = clockBtn();
+
+  // ---- Finishing -----------------------------------------------------------------
+  function openFinish() {
+    setFinishMsg('');
+    const off = match.official || {};
+    // Start from the tagged score; on a game already finished, from the score saved then.
+    setFinishing(Object.fromEntries(teams.map((t) => {
+      const tag = liveScore(events, t.id);
+      return [t.id, finished && off[t.id] ? { g: off[t.id].g ?? 0, p: off[t.id].p ?? 0 } : { g: tag.g, p: tag.p }];
+    })));
+  }
+  async function finish() {
+    setFinishMsg('Saving…');
+    try {
+      const res = await saveLiveGame(match.id, events, { final: finishing, finish: true });
+      if (!res?.ok) throw new Error(res?.error || 'Save failed');
+      store.set(key, { events, clock: { ...clock, running: false, ended: true }, sheets, dirty: false });
+      setFinished(true);
+      window.location.href = `/match/${match.id}`;
+    } catch (e) {
+      setFinishMsg(navigator.onLine === false
+        ? 'No signal. Your tags are safe on this device: try again when you have signal.'
+        : `Couldn’t finish: ${e.message || e}`);
+    }
+  }
+  async function reopen() {
+    const res = await saveLiveGame(match.id, events, { reopen: true });
+    if (res?.ok) { setFinished(false); setClock((c) => ({ ...c, ended: false })); }
+  }
 
   const sheetOf = (teamId) => parseSheet(sheets[teamId]);
   const rows = useMemo(() => events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), [events, teams]);
@@ -259,6 +292,7 @@ export default function Tagger({ match, teams, saved }) {
           <span className={`lt-time num ${clock.running ? 'run' : ''}`}>{clock.half ? `${clock.half === 1 ? '1st' : '2nd'} ${mmss(secs)}` : 'Not started'} <small>{clock.half ? quarter : ''}</small></span>
           {clock.half > 0 && <><button type="button" onClick={() => nudge(-60)} aria-label="Clock back a minute">−1′</button><button type="button" onClick={() => nudge(60)} aria-label="Clock forward a minute">+1′</button></>}
           <button type="button" className="primary" onClick={cbGo}>{cbLabel}</button>
+          {clock.half === 2 && !clock.running && !finished && <button type="button" onClick={() => setClock({ ...clock, running: true, since: Date.now(), ended: false })}>Restart clock</button>}
           <span className={`lt-sync ${sync.state}`} title={sync.msg}>
             {sync.state === 'saved' ? 'Saved' : sync.state === 'saving' ? 'Saving…' : sync.state === 'offline' ? 'Not sent yet' : 'Saving soon'}
           </span>
@@ -268,6 +302,11 @@ export default function Tagger({ match, teams, saved }) {
             <button key={k} type="button" className={view === k ? 'on' : ''} onClick={() => setView(k)}>{t}</button>
           ))}
         </nav>
+        {finished && (
+          <p className="lt-done small">Game finished and saved. You can still correct tags here.{' '}
+            <a href={`/match/${match.id}`}>Open dashboard</a> · <button type="button" className="linkish" onClick={openFinish}>Change final score</button> · <button type="button" className="linkish" onClick={reopen}>Reopen as live</button>
+          </p>
+        )}
         {sync.state === 'offline' && <p className="lt-warn small">{sync.msg || 'Not sent yet'}. Everything is kept on this device and will send when there’s signal.</p>}
       </div>
 
@@ -313,6 +352,10 @@ export default function Tagger({ match, teams, saved }) {
         </div>
       )}
 
+      {view === 'log' && !finished && (
+        <p className="center"><button type="button" onClick={openFinish}>Finish game now</button><br /><span className="muted small">For a game you’re stopping early, or if you never started the clock.</span></p>
+      )}
+
       {view === 'sheets' && (
         <div className="lt-sheets">
           <p className="muted small">One player per line, number first (e.g. <code>14 Diarmuid Murtagh</code>). Names then show on the player buttons and in the scorers. Kept on this device.{match.hideNames && ' Names are hidden on the site for this grade.'}</p>
@@ -328,6 +371,34 @@ export default function Tagger({ match, teams, saved }) {
         <div className="lt-toast" style={{ borderColor: COLORS[T(toast.team)] }}>
           <span>{describe(toast, teams)}</span>
           {events.some((x) => x.lid === toast.lid) && <button type="button" onClick={() => { remove(toast.lid); setToast(null); }}>Undo</button>}
+        </div>
+      )}
+
+      {finishing && (
+        <div className="lt-sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) setFinishing(null); }}>
+          <div className="lt-panel lt-finish" style={{ '--tc': '#2b3c81' }}>
+            <div className="lt-panel-head"><b>Finish game</b><span className="muted small">{events.length} tags</span></div>
+            <p className="small">Check the final score. It starts from your tags: correct it if you missed a score, and the dashboard will flag any gap.</p>
+            {teams.map((t, i) => {
+              const tag = liveScore(events, t.id);
+              const f = finishing[t.id];
+              const set = (k, v) => setFinishing({ ...finishing, [t.id]: { ...f, [k]: v } });
+              return (
+                <div key={t.id} className="lt-final">
+                  <b style={{ color: COLORS[i] }}>{t.name}</b>
+                  <input type="number" min="0" inputMode="numeric" aria-label={`${t.name} goals`} value={f.g} onChange={(e) => set('g', e.target.value)} />
+                  <span>-</span>
+                  <input type="number" min="0" inputMode="numeric" aria-label={`${t.name} points`} value={f.p} onChange={(e) => set('p', e.target.value)} />
+                  <span className="muted small">tagged {tag.g}-{String(tag.p).padStart(2, '0')}</span>
+                </div>
+              );
+            })}
+            {finishMsg && <p className={`small ${finishMsg === 'Saving…' ? 'muted' : 'lt-warn'}`}>{finishMsg}</p>}
+            <div className="lt-panel-foot">
+              <button type="button" onClick={() => setFinishing(null)}>Back</button>
+              <button type="button" className="primary" onClick={finish} disabled={finishMsg === 'Saving…'}>Finish and open dashboard</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -375,6 +446,12 @@ export default function Tagger({ match, teams, saved }) {
                   <>
                     <div className="lt-label">Won by</div>
                     <Players sheet={sheetOf(edit.team)} value={edit.player} color={COLORS[editTeam]} onPick={(p) => update({ player: p })} />
+                  </>
+                )}
+                {edit.kind === 'foul' && (
+                  <>
+                    <div className="lt-label">Free won by ({teams[1 - editTeam].name})</div>
+                    <Players sheet={sheetOf(teams[1 - editTeam].id)} value={edit.player} color={COLORS[1 - editTeam]} onPick={(p) => update({ player: p })} />
                   </>
                 )}
               </>

@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { db } from '../../../lib/db';
 import { requireAdmin } from '../../../lib/session';
-import { LIVE_PREFIX, isLiveCode, toRow } from '../../../lib/live';
+import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow } from '../../../lib/live';
 
 const clean = (s) => String(s || '').trim();
 
@@ -91,7 +91,9 @@ export async function startLiveGame(_prev, form) {
 // Saves the tagger's whole event list for a live game, replacing what was
 // there, and updates the score from the tags. Only for games started in the
 // tagger, so an imported Nacsport game can never be overwritten from here.
-export async function saveLiveGame(matchId, events) {
+// opts.final = { [teamId]: { g, p } } sets the official score; opts.finish
+// closes the game (no longer shown as live).
+export async function saveLiveGame(matchId, events, opts = {}) {
   try {
     await requireAdmin();
     const { data: m, error } = await db.from('matches')
@@ -118,7 +120,22 @@ export async function saveLiveGame(matchId, events) {
       const { error: ie } = await insertWithSource('events', rows.slice(i, i + 500));
       if (ie) throw new Error(`Saving events: ${ie.message}`);
     }
-    await db.from('matches').update(score).eq('id', m.id);
+    const upd = {};
+    if (opts.final) {
+      teams.forEach((t, i) => {
+        const f = opts.final[t.id] || {};
+        upd[`team${i + 1}_goals`] = Math.max(0, Number(f.g) || 0);
+        upd[`team${i + 1}_points`] = Math.max(0, Number(f.p) || 0);
+      });
+    } else if (!isFinishedCode(m.match_code)) {
+      Object.assign(upd, score); // live score from the tags until the game is finished
+    }
+    if (opts.finish && !isFinishedCode(m.match_code)) upd.match_code = `${m.match_code}-F`;
+    if (opts.reopen && isFinishedCode(m.match_code)) upd.match_code = m.match_code.replace(/-F$/, '');
+    if (Object.keys(upd).length) {
+      const { error: ue } = await db.from('matches').update(upd).eq('id', m.id);
+      if (ue) throw new Error(`Updating the score: ${ue.message}`);
+    }
     return { ok: true, count: rows.length, at: Date.now() };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };

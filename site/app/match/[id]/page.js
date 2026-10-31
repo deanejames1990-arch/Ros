@@ -6,7 +6,7 @@ import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
 import { PrintButton, SectionImages } from '../../report/Export';
 import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
-import { isLiveCode } from '../../../lib/live';
+import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -64,7 +64,7 @@ export default async function Match({ params, searchParams }) {
 
   // A game started in the live tagger on or about today: keep the page updating.
   const trendMin = [5, 10, 15].includes(Number(searchParams.trend)) ? Number(searchParams.trend) : 10;
-  const liveNow = isLiveCode(m.match_code) && Math.abs(Date.now() - new Date(m.match_date).getTime()) < 36 * 3600 * 1000;
+  const liveNow = isLiveNow(m);
 
   return (
     <>

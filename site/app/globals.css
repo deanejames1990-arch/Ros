@@ -413,3 +413,13 @@ button.primary{background:var(--g);color:#fff}
 .mb em{position:absolute;font-style:normal;font-size:.7rem;font-weight:700}
 .mb .up em{top:0}.mb .dn em{bottom:0}
 .mb small{font-size:.62rem;color:var(--mut)}
+.danger{width:100%;border-collapse:collapse;font-size:.88rem}
+.danger th{font-size:.7rem;color:var(--mut);font-weight:600;text-align:right;padding:4px 3px;line-height:1.15}
+.danger th:first-child{text-align:left}
+.danger td{padding:5px 3px;border-top:1px solid #eef1f7;text-align:right;white-space:nowrap}
+.danger td:first-child{text-align:left;font-weight:700}
+.danger tr.hot td{background:color-mix(in srgb,var(--tc) 9%,#fff)}
+.lt-done{margin:0;background:#e3f1e5;border-radius:8px;padding:6px 10px;color:#1d4d2a;text-align:center}
+button.linkish{background:none;padding:0;font:inherit;color:var(--g);text-decoration:underline;font-weight:600}
+.lt-final{display:grid;grid-template-columns:1fr 3.6rem auto 3.6rem auto;align-items:center;gap:8px}
+.lt-final input{font:700 1.2rem system-ui,sans-serif;padding:8px;border:1px solid #cfd6e4;border-radius:8px;text-align:center;width:100%}

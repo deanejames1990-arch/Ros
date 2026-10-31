@@ -1,7 +1,7 @@
 import { db, MATCH_SELECT } from '../lib/db';
 import { compType } from '../lib/analysis';
 import { score } from './components';
-import { isLiveCode } from '../lib/live';
+import { isLiveNow } from '../lib/live';
 
 export const dynamic = 'force-dynamic';
 
@@ -160,7 +160,7 @@ export default async function Home({ searchParams }) {
           <h2>{g.name}{g.grade && g.grade !== 'Senior' ? <span className="muted"> · {g.grade}</span> : ''}</h2>
           {g.games.map((m) => {
             const r = side ? fromOurSide(m, side) : null;
-            const live = isLiveCode(m.match_code) && Math.abs(Date.now() - new Date(m.match_date).getTime()) < 36 * 3600 * 1000;
+            const live = isLiveNow(m);
             return (
               <a key={m.id} className="card game" href={`/match/${m.id}`}>
                 {live ? <span className="badge live">LIVE</span> : <span className={`badge ${r ? r.res : 'N'}`}>{r ? r.res : '–'}</span>}

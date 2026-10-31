@@ -32,6 +32,37 @@ export default function Trends({ events, teams, halfLen = 35, windowMin = 10, us
       ) : (
         <p className="muted small">Nothing standing out yet.</p>
       )}
+      {teams.filter((tm) => tm.id !== usId).map((tm) => {
+        const rows = (t.danger[tm.id] || []).slice(0, 6);
+        const us = teams.find((x) => x.id !== tm.id);
+        return (
+          <div key={tm.id}>
+            <div className="vs-heading">{usId == null ? `${tm.name} danger players` : `${tm.name} players hurting us`}</div>
+            {rows.length ? (
+              <div className="wrap">
+                <table className="danger" style={{ '--tc': tm.color }}>
+                  <thead><tr><th /><th>Score</th><th>Shots</th><th title={`Frees won off ${us.name}`}>Frees won</th><th title={`Turnovers won off ${us.name}`}>T/O won</th><th title={`${us.name} kick-outs won`}>{usId == null ? `${us.name.split(' ')[0]} KOs won` : 'Our KOs won'}</th><th>Last {windowMin}′</th></tr></thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.who} className={r.recent ? 'hot' : ''}>
+                        <td><i className="sw" style={{ background: tm.color }} />{r.who}</td>
+                        <td className="num"><b>{r.pts ? r.line : '–'}</b></td>
+                        <td className="num">{r.shots ? `${r.scores}/${r.shots}` : '–'}</td>
+                        <td className="num">{r.freesWon || '–'}</td>
+                        <td className="num">{r.toWon || '–'}</td>
+                        <td className="num">{r.koWon || '–'}</td>
+                        <td className="num">{r.recent ? <b>{r.recent}</b> : '–'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="muted small">No {tm.name} players tagged yet. Pick the player when you tag a shot, free, turnover or kick-out.</p>
+            )}
+          </div>
+        );
+      })}
       {t.blocks.length > 0 && (
         <>
           <div className="vs-heading">Momentum: points per 5 minutes</div>
