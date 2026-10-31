@@ -4,6 +4,7 @@ import { currentRole } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
 import { ShotMap, ShotLegend, hasShotMap } from '../report/ShotMap';
+import { GRID } from '../report/sections';
 import MergePlayer from './[id]/MergePlayer';
 
 
@@ -129,6 +130,32 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
           </tbody>
         </table>
       </div>
+
+      {(() => {
+        // Shots by box, where the tagging records a box (no exact spot).
+        const boxes = {};
+        for (const g of games) for (const [z, n] of Object.entries(g.row?.boxes || {})) boxes[z] = (boxes[z] || 0) + n;
+        const tot = Object.values(boxes).reduce((a, b) => a + b, 0);
+        if (!tot) return null;
+        const max = Math.max(...Object.values(boxes));
+        return (
+          <>
+            <h2>Shots by box</h2>
+            <div className="card">
+              <div className="zone-wrap" style={{ maxWidth: 360, margin: '0 auto' }}>
+                <div className="zone-grid">
+                  {GRID.flat().map((b) => (
+                    <div key={b} className="zone" style={boxes[b] ? { background: `color-mix(in srgb, #3b4f9e ${Math.round((0.15 + 0.6 * (boxes[b] / max)) * 100)}%, #fff)` } : undefined}>
+                      <span className="zone-no">{b}</span>{boxes[b] ? <b>{boxes[b]}</b> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="muted small center">{tot} of {total.shots} shots have a box tagged.</p>
+            </div>
+          </>
+        );
+      })()}
 
       {hasShotMap(myShots) && (
         <>
