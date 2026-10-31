@@ -7,12 +7,8 @@ import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, Player
 import { PrintButton, SectionImages } from '../../report/Export';
 import { nameEvents } from '../../../lib/players';
 import { currentRole } from '../../../lib/session';
-import { trends } from '../../../lib/trends';
-import HurtUs, { addUpHurt } from '../../report/HurtUs';
 
 export const dynamic = 'force-dynamic';
-
-const US = /roscommon/i;
 
 const TEAM = '#3b4f9e'; // the team the report is about (crest blue)
 const OPP = '#c4572a'; // everyone they played
@@ -60,9 +56,7 @@ export default async function TeamReport({ params, searchParams }) {
     const r = analyseMatch({ events, teams: t });
     const mineId = ids.includes(m.team1_id) ? m.team1_id : m.team2_id;
     const oppId = mineId === m.team1_id ? m.team2_id : m.team1_id;
-    // Players doing the damage, on each side (whole game).
-    const dz = trends({ events, teams: t, usId: null }).danger;
-    return { m, tagged: true, mine: r.byTeam[mineId], opp: r.byTeam[oppId], oppName: t.find((x) => x.id === oppId).name, oppId, mineId, dangerMine: dz[mineId] || [], dangerOpp: dz[oppId] || [] };
+    return { m, tagged: true, mine: r.byTeam[mineId], opp: r.byTeam[oppId], oppName: t.find((x) => x.id === oppId).name };
   }));
   // Games left out of the numbers (?x=12,15), e.g. a freak win or loss.
   const excluded = new Set(String(searchParams.x || '').split(',').map(Number).filter(Boolean));
@@ -226,21 +220,6 @@ export default async function TeamReport({ params, searchParams }) {
             const l = (seasonApps || []).filter((x) => ids.includes(x.team_id) && x.players);
             return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;
           })()} />
-          {(() => {
-            const appLinks = Object.fromEntries((seasonApps || []).filter((x) => x.players).map((x) => [`${x.team_id}:${x.players.name.toLowerCase()}`, x.players.id]));
-            if (US.test(teamName)) {
-              // Roscommon: the opposition players who hurt us most across these games.
-              const rows = addUpHurt(tagged.map((d) => ({ rows: d.dangerOpp, teamId: d.oppId, team: d.oppName })));
-              return <HurtUs rows={rows} title="Opposition players who hurt us most" showTeam links={appLinks}
-                note={`Across ${tagged.length} tagged game${tagged.length === 1 ? '' : 's'}.`} />;
-            }
-            // Opposition: their players who hurt Roscommon, in games against Roscommon.
-            const v = tagged.filter((d) => US.test(d.oppName));
-            if (!v.length) return null;
-            const rows = addUpHurt(v.map((d) => ({ rows: d.dangerMine, teamId: d.mineId, team: teamName })));
-            return <HurtUs rows={rows} title={`${teamName} players who hurt Roscommon`} links={appLinks}
-              note={`In ${v.length} game${v.length === 1 ? '' : 's'} against Roscommon.`} />;
-          })()}
         </>
       )}
     </>

@@ -459,4 +459,3 @@ input.sheet-no{font:inherit;font-weight:800;padding:6px 2px;border:1px solid #cf
 .merge-player summary{cursor:pointer;font-weight:600}
 .merge-row{display:flex;gap:8px;flex-wrap:wrap}
 .merge-row select{font:inherit;padding:8px;border:1px solid #cfd6e4;border-radius:8px}
-.danger.season td:first-child a{color:inherit}
