@@ -200,7 +200,7 @@ const COLS = [
   { k: 'assists', label: 'Assists' },
 ];
 
-export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false }) {
+export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false, links = null }) {
   if (hidden) {
     return (
       <div className="card">
@@ -231,7 +231,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
           <tbody>
             {list.map((p, i) => (
               <tr key={p.name} className={i >= limit ? 'extra' : undefined}>
-                <td>{p.name}</td>
+                <td>{links?.[p.name.toLowerCase()] ? <a href={`/player/${links[p.name.toLowerCase()]}`}>{p.name}</a> : p.name}</td>
                 {cols.map((c) => <td key={c.k}>{c.fmt ? c.fmt(p) : p[c.k] || '—'}</td>)}
               </tr>
             ))}
@@ -247,7 +247,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false })
         From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal; att = attempts (scored + missed).
         {list.some((p) => p.twoScored) && !list.some((p) => p.twoTrackedGames) && ' Missed two-point attempts aren’t tagged in this data (n/t), so they count as 1-pt attempts.'}
         {s.total > tagged && ` ${s.total - tagged} of ${T.name}’s ${s.total} points have no shooter tagged.`}
-        {' '}Spelling differences in the tags show as separate players for now.
+        {links ? ' Linked names open the player’s profile (from the team sheets).' : ' Add team sheets to link players to their profiles.'}
       </p>
     </div>
   );

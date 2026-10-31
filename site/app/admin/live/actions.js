@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { db } from '../../../lib/db';
 import { requireAdmin } from '../../../lib/session';
+import { syncAppearanceScores } from '../sheet-actions';
 import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow } from '../../../lib/live';
 
 const clean = (s) => String(s || '').trim();
@@ -136,6 +137,7 @@ export async function saveLiveGame(matchId, events, opts = {}) {
       const { error: ue } = await db.from('matches').update(upd).eq('id', m.id);
       if (ue) throw new Error(`Updating the score: ${ue.message}`);
     }
+    await syncAppearanceScores(m.id).catch(() => {});
     return { ok: true, count: rows.length, at: Date.now() };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };

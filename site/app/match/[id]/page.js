@@ -9,6 +9,7 @@ import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
 import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
+import { nameEvents } from '../../../lib/players';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,9 @@ export default async function Match({ params, searchParams }) {
   const [A, B] = teams.map((t, i) => ({ ...t, color: colors[i] }));
 
   // Underage competitions hide player names everywhere on the page.
-  const events = showNames ? rawEvents : withoutNames(rawEvents);
+  // Tags made by number get the name from the team sheet.
+  const namedEvents = nameEvents(rawEvents, apps || [], teams);
+  const events = showNames ? namedEvents : withoutNames(namedEvents);
   const r = analyseMatch({ events, teams, match: m, period });
   const a = r.byTeam[A.id];
   const b = r.byTeam[B.id];
@@ -59,6 +62,10 @@ export default async function Match({ params, searchParams }) {
   };
 
   const hasEvents = events.length > 0;
+  const linkMap = (tid) => {
+    const l = (apps || []).filter((x) => x.team_id === tid && x.players);
+    return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;
+  };
   const teamHref = (name) => `/team/${encodeURIComponent(name)}?${new URLSearchParams({ grade: m.competitions.grade || 'Senior', year: String(m.competitions.seasons.year) })}`;
   const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
 
@@ -214,8 +221,8 @@ export default async function Match({ params, searchParams }) {
 
           <h2>Players</h2>
           <div className="players-stack">
-            <PlayerTable T={A} s={a} hidden={!showNames} />
-            <PlayerTable T={B} s={b} hidden={!showNames} />
+            <PlayerTable T={A} s={a} hidden={!showNames} links={linkMap(A.id)} />
+            <PlayerTable T={B} s={b} hidden={!showNames} links={linkMap(B.id)} />
           </div>
 
           <h2>Where the scores came from</h2>

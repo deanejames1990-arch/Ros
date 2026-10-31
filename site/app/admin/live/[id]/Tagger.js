@@ -6,6 +6,8 @@ import { toRow, fromRow, quarterFor, parseSheet, outsideArc, liveScore } from '.
 import { GRID } from '../../../report/sections';
 import { PitchLines, VIEW } from '../../../report/ShotMap';
 import LiveReport from './LiveReport';
+import SheetEditor from '../../SheetEditor';
+import { nameEvents } from '../../../../lib/players';
 import Trends from '../../../report/Trends';
 
 const COLORS = ['#3b4f9e', '#c4572a'];
@@ -91,7 +93,11 @@ function Boxes({ value, onPick, color }) {
   );
 }
 
-export default function Tagger({ match, teams, saved }) {
+// Team sheets are kept as { teamId: [{ no, name, id }] }; older copies on a
+// device were plain text.
+const asEntries = (v) => (Array.isArray(v) ? v : Object.entries(parseSheet(v || '')).map(([no, name]) => ({ no: Number(no), name, id: null })));
+
+export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   const key = `ros-live-${match.id}`;
   const [ready, setReady] = useState(false);
   const [events, setEvents] = useState([]);
@@ -114,9 +120,15 @@ export default function Tagger({ match, teams, saved }) {
     if (local && (local.dirty || (local.events?.length || 0) >= saved.length)) {
       setEvents(local.events || []);
       setClock(local.clock || clock);
-      setSheets(local.sheets || {});
+      // The site's sheet wins unless this device has one the site doesn't.
+      setSheets(Object.fromEntries(teams.map((t) => {
+        const site = sheetInfo[t.id]?.sheet || [];
+        const mine = asEntries(local.sheets?.[t.id]);
+        return [t.id, site.length ? site : mine];
+      })));
       if (local.dirty) setSync({ state: 'pending', dirty: 1, msg: '' });
     } else {
+      setSheets(Object.fromEntries(teams.map((t) => [t.id, sheetInfo[t.id]?.sheet || []])));
       const evs = saved.map((r) => fromRow(r, teams)).filter(Boolean)
         .sort((a, b) => a.half - b.half || a.sec - b.sec);
       setEvents(evs);
@@ -266,8 +278,11 @@ export default function Tagger({ match, teams, saved }) {
     if (res?.ok) { setFinished(false); setClock((c) => ({ ...c, ended: false })); }
   }
 
-  const sheetOf = (teamId) => parseSheet(sheets[teamId]);
-  const rows = useMemo(() => events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), [events, teams]);
+  const sheetOf = (teamId) => Object.fromEntries((sheets[teamId] || []).filter((e) => e.no).map((e) => [e.no, e.name]));
+  const rows = useMemo(() => {
+    const apps = teams.flatMap((t) => (sheets[t.id] || []).map((e) => ({ team_id: t.id, jersey_no: e.no, players: { name: e.name } })));
+    return nameEvents(events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), apps, teams);
+  }, [events, teams, sheets]);
   const scores = teams.map((t) => liveScore(events, t.id));
   const counts = (kind, team) => events.filter((e) => e.kind === kind && e.team === team).length;
   const reportStart = clock.half === 1 && !clock.running ? '1st Half' : 'All';
@@ -358,11 +373,10 @@ export default function Tagger({ match, teams, saved }) {
 
       {view === 'sheets' && (
         <div className="lt-sheets">
-          <p className="muted small">One player per line, number first (e.g. <code>14 Diarmuid Murtagh</code>). Names then show on the player buttons and in the scorers. Kept on this device.{match.hideNames && ' Names are hidden on the site for this grade.'}</p>
+          <p className="muted small lt-sheets-note">Saved to the site, so each player builds up a profile game by game. Pick names from the list so they’re spelled the same every time. Tags you made by number pick up the name from here, even ones made before you filled the sheet in.{match.hideNames && ' Names are hidden from viewers for this grade.'}</p>
           {teams.map((t, i) => (
-            <label key={t.id}><b style={{ color: COLORS[i] }}>{t.name}</b>
-              <textarea rows={12} value={sheets[t.id] || ''} onChange={(e) => setSheets({ ...sheets, [t.id]: e.target.value })} placeholder={'1 Goalkeeper\n2 …'} />
-            </label>
+            <SheetEditor key={t.id} matchId={match.id} team={{ ...t, color: COLORS[i] }} info={sheetInfo[t.id]}
+              value={sheets[t.id] || []} onChange={(list) => setSheets((s) => ({ ...s, [t.id]: list }))} hideNote={i > 0} />
           ))}
         </div>
       )}

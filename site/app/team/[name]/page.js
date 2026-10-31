@@ -5,6 +5,8 @@ import { CompareTypes } from '../../report/sections';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
+import { nameEvents } from '../../../lib/players';
+import { currentRole } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +40,16 @@ export default async function TeamReport({ params, searchParams }) {
   const types = [...new Set(inSeason.map((m) => compType(m.competitions?.name)))].sort();
   const comp = ['League', 'Championship'].find((x) => x.toLowerCase() === String(searchParams.comp || '').toLowerCase()) || '';
 
+  // Team sheets for these games: they name tags made by number, and give the squad list.
+  const role = await currentRole();
+  const { data: seasonApps } = inSeason.length
+    ? await db.from('appearances').select('match_id, team_id, jersey_no, started, goals, points, player_id, players(id, name)').in('match_id', inSeason.map((m) => m.id))
+    : { data: [] };
+
   // Analyse every tagged game and keep this team's side and the opposition's side.
   const analysed = await Promise.all(inSeason.map(async (m) => {
-    const raw = await loadEvents(m.id);
+    const t2 = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
+    const raw = nameEvents(await loadEvents(m.id), (seasonApps || []).filter((a) => a.match_id === m.id), t2);
     const events = m.competitions?.show_player_names === false ? withoutNames(raw) : raw;
     if (!events.length) return { m, tagged: false };
     const t = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
@@ -169,6 +178,35 @@ export default async function TeamReport({ params, searchParams }) {
         })}
       </div>
 
+      {(() => {
+        // Squad: everyone on a team sheet for this team in the selected games.
+        const doneIds = new Set(done.map((d) => d.m.id));
+        const hidden = new Set(done.filter((d) => d.m.competitions?.show_player_names === false).map((d) => d.m.id));
+        const sq = new Map();
+        for (const a of seasonApps || []) {
+          if (!ids.includes(a.team_id) || !doneIds.has(a.match_id) || !a.players) continue;
+          if (hidden.has(a.match_id) && role !== 'admin') continue;
+          const r = sq.get(a.player_id) || { id: a.player_id, name: a.players.name, games: 0, starts: 0, goals: 0, points: 0, nos: new Set() };
+          r.games += 1; if (a.started) r.starts += 1; r.goals += a.goals || 0; r.points += a.points || 0; if (a.jersey_no) r.nos.add(a.jersey_no);
+          sq.set(a.player_id, r);
+        }
+        const list = [...sq.values()].sort((x, y) => y.games - x.games || (3 * y.goals + y.points) - (3 * x.goals + x.points) || x.name.localeCompare(y.name));
+        if (!list.length) return null;
+        return (
+          <details className="card squad no-print" open={list.length <= 30}>
+            <summary><b>Squad · {list.length} players on team sheets</b> <span className="muted small">open a player for their profile</span></summary>
+            <div className="squad-grid">
+              {list.map((p) => (
+                <a key={p.id} href={`/player/${p.id}`} className="squad-p">
+                  <b>{p.name}</b>
+                  <span className="muted small">{p.games} game{p.games === 1 ? '' : 's'} · {p.starts} start{p.starts === 1 ? '' : 's'}{p.goals || p.points ? ` · ${score(p.goals, p.points)}` : ''}{p.nos.size ? ` · #${[...p.nos].join('/')}` : ''}</span>
+                </a>
+              ))}
+            </div>
+          </details>
+        );
+      })()}
+
       {tagged.length === 0 ? (
         <p className="card muted">No tagged games for {teamName} in this selection yet.</p>
       ) : (
@@ -178,7 +216,10 @@ export default async function TeamReport({ params, searchParams }) {
           <PeriodSection A={A} B={B} a={a} b={b} />
           <TurnoverSection A={A} B={B} a={a} />
           <h2>{teamName} players</h2>
-          <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} />
+          <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} links={(() => {
+            const l = (seasonApps || []).filter((x) => ids.includes(x.team_id) && x.players);
+            return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;
+          })()} />
         </>
       )}
     </>

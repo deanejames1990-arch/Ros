@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../../lib/db';
 import { isLiveCode, isFinishedCode } from '../../../../lib/live';
+import { sheetData } from '../../../../lib/sheets-data';
 import Tagger from './Tagger';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +13,10 @@ export default async function LiveGame({ params }) {
   if (!isLiveCode(m.match_code)) {
     return <p className="card">This game was imported from a file, so it can’t be tagged live. <a href={`/match/${m.id}`}>Open the dashboard</a>.</p>;
   }
-  const events = await loadEvents(m.id);
   const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
   // Roscommon (or whoever "our team" is) on the left.
   if (/roscommon/i.test(teams[1].name) && !/roscommon/i.test(teams[0].name)) teams.reverse();
+  const [events, sheets] = await Promise.all([loadEvents(m.id), sheetData(m.id, teams)]);
   const halfLen = Number(String(m.match_code).split('-')[2]) || (m.competitions?.grade === 'Senior' ? 35 : 30);
   return (
     <Tagger
@@ -24,6 +25,7 @@ export default async function LiveGame({ params }) {
         official: { [m.team1_id]: { g: m.team1_goals, p: m.team1_points }, [m.team2_id]: { g: m.team2_goals, p: m.team2_points } } }}
       teams={teams}
       saved={events}
+      sheetInfo={sheets}
     />
   );
 }
