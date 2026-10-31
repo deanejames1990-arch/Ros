@@ -4,7 +4,7 @@ import { passwords } from '../../lib/auth';
 import { CompetitionForm } from './forms';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Manage · Roscommon GAA Stats' };
+export const metadata = { title: 'Manage · James Deane Analysis' };
 
 export default async function Manage({ searchParams }) {
   const [{ data: matches }, { data: comps }, { data: counts }] = await Promise.all([

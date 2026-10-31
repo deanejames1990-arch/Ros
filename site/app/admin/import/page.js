@@ -2,7 +2,7 @@ import { db } from '../../../lib/db';
 import ImportForm from './ImportForm';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Add a game · Roscommon GAA Stats' };
+export const metadata = { title: 'Add a game · James Deane Analysis' };
 
 export default async function ImportPage() {
   const [{ data: teams }, { data: comps }, { data: recent }] = await Promise.all([

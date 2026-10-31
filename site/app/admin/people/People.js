@@ -41,7 +41,7 @@ function Fields({ grades, p = {} }) {
 function CodeBox({ name, code, onClose }) {
   const [copied, setCopied] = useState('');
   const site = typeof window !== 'undefined' ? window.location.origin : '';
-  const msg = `Hi ${String(name).split(' ')[0]}, here's your login for the Roscommon GAA stats site.\n${site}\nAccess code: ${code}\nPlease keep it to yourself.`;
+  const msg = `Hi ${String(name).split(' ')[0]}, here's your login for James Deane Analysis.\n${site}\nAccess code: ${code}\nPlease keep it to yourself.`;
   const copy = async (text, what) => { try { await navigator.clipboard.writeText(text); setCopied(what); } catch { setCopied(''); } };
   return (
     <div className="card code-box">

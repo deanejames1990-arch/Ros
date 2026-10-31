@@ -1,6 +1,6 @@
 import LoginForm from './LoginForm';
 
-export const metadata = { title: 'Log in · Roscommon GAA Stats' };
+export const metadata = { title: 'Log in · James Deane Analysis' };
 
 export default function Login({ searchParams }) {
   const next = typeof searchParams.next === 'string' ? searchParams.next : '/';

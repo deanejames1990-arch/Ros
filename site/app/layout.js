@@ -2,7 +2,7 @@ import './globals.css';
 import { currentAccess } from '../lib/session';
 import { authEnabled } from '../lib/auth';
 
-export const metadata = { title: 'Roscommon GAA Stats' };
+export const metadata = { title: 'James Deane Analysis' };
 
 export default async function RootLayout({ children }) {
   const access = await currentAccess();
@@ -11,7 +11,7 @@ export default async function RootLayout({ children }) {
     <html lang="en">
       <body>
         <header>
-          <a href="/" className="brand"><img src="/crest.png" alt="Roscommon GAA crest" />Roscommon GAA Stats</a>
+          <a href="/" className="brand"><img src="/crest.png" alt="Roscommon GAA crest" />James Deane Analysis</a>
           {role && (
             <nav className="nav-links">
               <a className="nav" href="/games">Games</a>

@@ -4,7 +4,7 @@ import StartForm from './StartForm';
 import { currentAccess, gradeOk } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Live tagger · Roscommon GAA Stats' };
+export const metadata = { title: 'Live tagger · James Deane Analysis' };
 
 export default async function LivePage() {
   const [{ data: teams }, { data: comps }, { data: games }] = await Promise.all([

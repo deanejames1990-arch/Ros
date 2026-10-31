@@ -7,7 +7,7 @@ import { sheetData } from '../../../../lib/sheets-data';
 import SheetEditor from '../../SheetEditor';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Edit game · Roscommon GAA Stats' };
+export const metadata = { title: 'Edit game · James Deane Analysis' };
 
 export default async function EditGame({ params }) {
   const [{ data: g }, { data: comps }, { data: teams }, { count }] = await Promise.all([

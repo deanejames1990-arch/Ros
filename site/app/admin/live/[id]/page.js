@@ -6,7 +6,7 @@ import Tagger from './Tagger';
 import { currentAccess, gradeOk } from '../../../../lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Live tagger · Roscommon GAA Stats' };
+export const metadata = { title: 'Live tagger · James Deane Analysis' };
 
 export default async function LiveGame({ params }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', Number(params.id)).single();

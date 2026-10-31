@@ -2,7 +2,7 @@ import { db } from '../../../lib/db';
 import People from './People';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'People · Roscommon GAA Stats' };
+export const metadata = { title: 'People · James Deane Analysis' };
 
 const SETUP_SQL = `create table if not exists site_users (
   id bigint generated always as identity primary key,

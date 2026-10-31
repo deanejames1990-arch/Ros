@@ -2,7 +2,7 @@ import { db, MATCH_SELECT } from '../../lib/db';
 import { currentAccess, gradeOk } from '../../lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Teams · Roscommon GAA Stats' };
+export const metadata = { title: 'Teams · James Deane Analysis' };
 
 const ORDER = ['Senior', 'Junior', 'U21', 'U20', 'Minor', 'U17', 'Club'];
 const gOrder = (g) => ORDER.indexOf(g) + 1 || 99;
