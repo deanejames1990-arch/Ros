@@ -98,7 +98,7 @@ export default async function TeamReport({ params, searchParams }) {
 
   return (
     <>
-      <p className="muted"><a href="/">All games</a></p>
+      <p className="muted"><a href="/games">All games</a></p>
       <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'}${comp ? ` ${comp}` : ''}${nExcluded ? ` (${nExcluded} excluded)` : ''} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
         <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}{comp ? <span className="muted"> · {comp}</span> : ''}</h1>
         <PrintButton />

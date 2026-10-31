@@ -79,7 +79,7 @@ export default async function Match({ params, searchParams }) {
       {liveNow && <LiveRefresh />}
       <p className="muted">
         {role === 'admin' && <span className="no-print">{isLiveCode(m.match_code) && <><a href={`/admin/live/${m.id}`}>Open in live tagger</a> · </>}<a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
-        <a href="/">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
+        <a href="/games">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
       </p>
       <div className="scoreline" data-export-title={`${A.name} ${score(m.team1_goals, m.team1_points)} – ${score(m.team2_goals, m.team2_points)} ${B.name} · ${m.competitions.name} ${m.competitions.seasons.year}${m.stage ? ` · ${m.stage}` : ''} · ${m.match_date}`}>
         <a className="team" href={teamHref(A.name)} title={`${A.name} team report`}><i className="sw" style={{ background: A.color }} />{A.name}</a>

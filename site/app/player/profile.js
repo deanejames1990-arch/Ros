@@ -93,7 +93,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
 
   return (
     <>
-      <p className="muted"><a href="/">All games</a>{teamsPlayed.map((t) => <span key={t}> · <a href={`/team/${encodeURIComponent(t)}`}>{t}</a></span>)}</p>
+      <p className="muted"><a href="/games">All games</a>{teamsPlayed.map((t) => <span key={t}> · <a href={`/team/${encodeURIComponent(t)}`}>{t}</a></span>)}</p>
       <div className="hero">
         <h1>{p.name}</h1>
       </div>

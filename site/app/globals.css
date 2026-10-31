@@ -459,3 +459,38 @@ input.sheet-no{font:inherit;font-weight:800;padding:6px 2px;border:1px solid #cf
 .merge-player summary{cursor:pointer;font-weight:600}
 .merge-row{display:flex;gap:8px;flex-wrap:wrap}
 .merge-row select{font:inherit;padding:8px;border:1px solid #cfd6e4;border-radius:8px}
+/* ---- Home ---------------------------------------------------------------- */
+.home-live{display:grid;gap:8px;margin-bottom:12px}
+.home-live-card{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:6px solid #1d9a45;text-decoration:none;color:var(--dk)}
+.home-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:4px 0 18px}
+.home-tile{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:var(--dk);border-top:4px solid var(--g);margin:0}
+.home-tile b{font-size:1.05rem}
+.home-tile.admin{border-top-color:var(--gold)}
+.home-tile:hover{box-shadow:0 4px 14px rgba(20,32,63,.12)}
+.home-hero{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.home-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.home-stats .stat{display:flex;flex-direction:column;gap:4px;margin:0}
+.stat-k{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+.home-stats b{font-size:1.5rem}
+.home-stats b small{font-size:.8rem;font-weight:600;color:var(--mut)}
+.form-row{display:flex;gap:4px}
+.form-row .badge{text-decoration:none}
+.trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.trend-chart{margin:0}
+.trend-chart figcaption{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.tc-legend{display:flex;gap:10px;font-size:.78rem;color:var(--mut)}
+.trend-chart svg{width:100%;display:block;overflow:visible}
+.tc-grid{stroke:#e6eaf2;stroke-width:1}
+.tc-axis{font-size:9px;fill:var(--mut)}
+.tc-label{font-size:10px;font-weight:700;fill:var(--dk)}
+.home-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.home-scorers{width:100%}
+@media (max-width:760px){.home-two{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .home-tiles{grid-template-columns:1fr 1fr;gap:8px}
+  .home-tile{padding:10px 12px}
+  .home-tile span{display:none}
+  .home-stats{grid-template-columns:1fr 1fr;gap:8px}
+  .home-stats b{font-size:1.2rem}
+  .home-hero h1{font-size:1.6rem}
+}

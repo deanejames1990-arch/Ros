@@ -1,192 +1,188 @@
-import { db, MATCH_SELECT } from '../lib/db';
-import { compType } from '../lib/analysis';
-import { score } from './components';
+import { db, MATCH_SELECT, loadEvents } from '../lib/db';
+import { analyseMatch, combineSides, withoutNames, compType } from '../lib/analysis';
+import { nameEvents } from '../lib/players';
 import { isLiveNow } from '../lib/live';
+import { currentRole } from '../lib/session';
+import { score } from './components';
+import { playerHref } from './report/sections';
+import TrendChart from './TrendChart';
 
 export const dynamic = 'force-dynamic';
 
 const US = /roscommon/i;
-const total = (g, p) => 3 * (g ?? 0) + (p ?? 0);
+const ROS = '#3b4f9e';
+const OPP = '#c4572a';
+const ORDER = ['Senior', 'Junior', 'U21', 'U20', 'Minor', 'U17', 'Club'];
+const pct = (a, b) => (b ? Math.round((100 * a) / b) : null);
+const avg = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : null);
 
-// Result from one team's side (Roscommon unless another is chosen); null if they didn't play.
-function fromOurSide(m, side = US) {
-  const t1 = side.test(m.team1.name), t2 = side.test(m.team2.name);
-  if (!t1 && !t2) return null;
-  const us = t1 ? { g: m.team1_goals, p: m.team1_points } : { g: m.team2_goals, p: m.team2_points };
-  const them = t1 ? { g: m.team2_goals, p: m.team2_points, name: m.team2.name } : { g: m.team1_goals, p: m.team1_points, name: m.team1.name };
-  const diff = total(us.g, us.p) - total(them.g, them.p);
-  return { us, them, diff, res: diff > 0 ? 'W' : diff < 0 ? 'L' : 'D', home: t1 };
-}
-
+// Home: where to go, how the season is going, and how it's trending.
 export default async function Home({ searchParams }) {
-  const grade = searchParams.grade || '';
-  const who = ['opp', 'all'].includes(searchParams.who) ? searchParams.who : 'ros';
-  const team = who === 'opp' ? (searchParams.team || '') : '';
-  const comp = ['League', 'Championship'].find((x) => x.toLowerCase() === String(searchParams.comp || '').toLowerCase()) || '';
-  let matches = [];
-  let problem = null;
-  try {
-    const { data, error } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(500);
-    if (error) problem = error.message;
-    matches = data || [];
-  } catch (e) {
-    problem = String(e.message || e);
-  }
+  const role = await currentRole();
+  const admin = role === 'admin';
+  const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: true });
+  const games = all || [];
+  const live = games.filter(isLiveNow);
+  const ours = games.filter((m) => US.test(m.team1.name) || US.test(m.team2.name));
 
-  const grades = [...new Set(matches.map((m) => m.competitions?.grade).filter(Boolean))];
-  const years = [...new Set(matches.map((m) => m.competitions?.seasons?.year).filter(Boolean))].sort((a, b) => b - a);
-  const year = Number(searchParams.year) || years[0] || null;
-  const isRos = (m) => US.test(m.team1.name) || US.test(m.team2.name);
-  const inScope = matches.filter(
-    (m) => (!grade || m.competitions?.grade === grade) && (!year || m.competitions?.seasons?.year === year)
-      && (!comp || compType(m.competitions?.name) === comp)
-  );
-  // Opposition teams: every team other than Roscommon in the games loaded.
-  const oppTeams = [...new Set(inScope.flatMap((m) => [m.team1.name, m.team2.name]))].filter((n) => !US.test(n)).sort();
-  const exact = (name) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-  const teamRe = team ? exact(team) : null;
-  const shown = inScope.filter((m) =>
-    who === 'all' ? true
-      : who === 'ros' ? isRos(m)
-      : teamRe ? teamRe.test(m.team1.name) || teamRe.test(m.team2.name) // all their games, incl. v Roscommon
-      : !isRos(m)
-  );
+  const grades = [...new Set(ours.map((m) => m.competitions?.grade).filter(Boolean))]
+    .sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
+  const grade = grades.includes(searchParams.grade) ? searchParams.grade : grades[0] || '';
+  const years = [...new Set(ours.filter((m) => m.competitions?.grade === grade).map((m) => m.competitions?.seasons?.year).filter(Boolean))].sort((a, b) => b - a);
+  const year = years.includes(Number(searchParams.year)) ? Number(searchParams.year) : years[0] || null;
+  const season = ours.filter((m) => m.competitions?.grade === grade && m.competitions?.seasons?.year === year);
 
-  // Season summary from Roscommon's side, or from the chosen opposition team's side.
-  const side = who === 'opp' ? teamRe : US;
-  const ours = side ? shown.map((m) => fromOurSide(m, side)).filter(Boolean) : [];
-  const sum = ours.reduce(
-    (s, r) => ({
-      P: s.P + 1,
-      W: s.W + (r.res === 'W'),
-      D: s.D + (r.res === 'D'),
-      L: s.L + (r.res === 'L'),
-      F: s.F + total(r.us.g, r.us.p),
-      A: s.A + total(r.them.g, r.them.p),
-    }),
-    { P: 0, W: 0, D: 0, L: 0, F: 0, A: 0 }
-  );
+  // Each game from Roscommon's side: result, and the tagged numbers where there are tags.
+  const { data: apps } = season.length
+    ? await db.from('appearances').select('match_id, team_id, jersey_no, players(id, name)').in('match_id', season.map((m) => m.id))
+    : { data: [] };
+  const rows = await Promise.all(season.map(async (m) => {
+    const usFirst = US.test(m.team1.name);
+    const usId = usFirst ? m.team1_id : m.team2_id;
+    const oppId = usFirst ? m.team2_id : m.team1_id;
+    const f = usFirst ? 3 * m.team1_goals + m.team1_points : 3 * m.team2_goals + m.team2_points;
+    const a = usFirst ? 3 * m.team2_goals + m.team2_points : 3 * m.team1_goals + m.team1_points;
+    const opp = usFirst ? m.team2.name : m.team1.name;
+    const base = {
+      m, usId, oppId, opp, f, a, res: f > a ? 'W' : f < a ? 'L' : 'D',
+      line: usFirst ? `${score(m.team1_goals, m.team1_points)} – ${score(m.team2_goals, m.team2_points)}` : `${score(m.team2_goals, m.team2_points)} – ${score(m.team1_goals, m.team1_points)}`,
+      short: opp.slice(0, 3).toUpperCase(),
+      date: new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' }),
+    };
+    const raw = await loadEvents(m.id);
+    if (!raw.length) return base;
+    const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
+    let events = nameEvents(raw, (apps || []).filter((x) => x.match_id === m.id), teams);
+    if (m.competitions?.show_player_names === false && !admin) events = withoutNames(events);
+    const r = analyseMatch({ events, teams });
+    return { ...base, us: r.byTeam[usId], them: r.byTeam[oppId] };
+  }));
+  const tagged = rows.filter((r) => r.us);
+  const usAll = combineSides(tagged.map((r) => r.us));
+  const themAll = combineSides(tagged.map((r) => r.them));
+  const rec = { W: rows.filter((r) => r.res === 'W').length, D: rows.filter((r) => r.res === 'D').length, L: rows.filter((r) => r.res === 'L').length };
+  const chartGames = rows.map((r) => ({ id: r.m.id, short: r.short, opp: r.opp, date: r.date }));
+  const tg = (fn) => rows.map((r) => (r.us ? fn(r) : null));
+  const scorers = (usAll.players || []).filter((p) => p.points > 0 && !/^#?\d+$/.test(p.name)).slice(0, 6);
+  const homeLink = (o) => `/?${new URLSearchParams({ ...(o.grade ?? grade ? { grade: o.grade ?? grade } : {}), ...(o.year ?? year ? { year: String(o.year ?? year) } : {}) })}`;
+  const recent = [...rows].reverse().slice(0, 5);
+  const form = [...rows].slice(-5);
 
-  // Group by competition, keeping the order of the most recent game in each.
-  const groups = [];
-  for (const m of shown) {
-    const key = m.competition_id;
-    let g = groups.find((x) => x.key === key);
-    if (!g) groups.push((g = { key, name: m.competitions?.name || 'Other', grade: m.competitions?.grade, games: [] }));
-    g.games.push(m);
-  }
-
-  const link = (o) => {
-    const p = new URLSearchParams();
-    const gr = o.grade ?? grade;
-    const yr = o.year ?? year;
-    const w = o.who ?? who;
-    const tm = o.team ?? (w === 'opp' ? team : '');
-    const cp = o.comp ?? comp;
-    if (cp) p.set('comp', cp.toLowerCase());
-    if (w !== 'ros') p.set('who', w);
-    if (tm) p.set('team', tm);
-    if (gr) p.set('grade', gr);
-    if (yr && yr !== years[0]) p.set('year', yr);
-    const s = p.toString();
-    return s ? `/?${s}` : '/';
-  };
+  const tiles = [
+    { href: '/games', t: 'Games', d: `${games.length} games: Roscommon and opposition, by season and competition` },
+    { href: '/teams', t: 'Teams', d: 'Every county on the site: opposition reports and squads' },
+    { href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, t: 'Roscommon report', d: `${grade} ${year || ''}: kick-outs, shooting, turnovers, players` },
+    ...(admin ? [
+      { href: '/admin/live', t: 'Live tagger', d: 'Tag a game as it happens, with quarter and half-time numbers', admin: true },
+      { href: '/admin/import', t: 'Add game', d: 'Load a Nacsport or Sportscode file', admin: true },
+      { href: '/admin', t: 'Manage', d: 'Edit games, team sheets and competitions', admin: true },
+    ] : []),
+  ];
 
   return (
     <>
-      <h1>Games</h1>
-
-      {problem && (
-        <div className="card check warn">
-          <b>Couldn’t load games.</b> <span className="muted">{problem}</span>
-        </div>
-      )}
-
-      <nav className="toolbar">
-        <div className="seg">
-          <a href={link({ who: 'ros', team: '' })} className={who === 'ros' ? 'on' : ''}>Roscommon</a>
-          <a href={link({ who: 'opp', team: '' })} className={who === 'opp' ? 'on' : ''}>Opposition</a>
-          <a href={link({ who: 'all', team: '' })} className={who === 'all' ? 'on' : ''}>All</a>
-        </div>
-        <div className="seg">
-          <a href={link({ grade: '' })} className={!grade ? 'on' : ''}>All grades</a>
-          {grades.map((g) => <a key={g} href={link({ grade: g })} className={grade === g ? 'on' : ''}>{g}</a>)}
-        </div>
-        <div className="seg">
-          <a href={link({ comp: '' })} className={!comp ? 'on' : ''}>League &amp; Champ</a>
-          <a href={link({ comp: 'League' })} className={comp === 'League' ? 'on' : ''}>League</a>
-          <a href={link({ comp: 'Championship' })} className={comp === 'Championship' ? 'on' : ''}>Championship</a>
-        </div>
-        {years.length > 0 && (
-          <div className="seg">
-            {years.map((y) => <a key={y} href={link({ year: y })} className={year === y ? 'on' : ''}>{y}</a>)}
-          </div>
-        )}
-      </nav>
-
-      {who === 'opp' && oppTeams.length > 0 && (
-        <div className="chips team-chips">
-          <a href={link({ team: '' })} className={`chip ${!team ? 'on' : ''}`}>All opposition</a>
-          {oppTeams.map((t) => (
-            <a key={t} href={link({ team: t })} className={`chip ${team.toLowerCase() === t.toLowerCase() ? 'on' : ''}`}>{t}</a>
+      {live.length > 0 && (
+        <div className="home-live">
+          {live.map((m) => (
+            <a key={m.id} href={`/match/${m.id}`} className="card home-live-card">
+              <span className="badge live">LIVE</span>
+              <b>{m.team1.name} {score(m.team1_goals, m.team1_points)} – {score(m.team2_goals, m.team2_points)} {m.team2.name}</b>
+              <span className="muted small">Being tagged now · open for live numbers and trends</span>
+            </a>
           ))}
         </div>
       )}
 
-      {(who === 'ros' || team) && (
-        <p className="report-link">
-          <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}), ...(comp ? { comp: comp.toLowerCase() } : {}) })}`}>
-            Open the {who === 'ros' ? 'Roscommon' : team} report: kick-outs, shooting, quarters, turnovers, players →
+      <nav className="home-tiles">
+        {tiles.map((x) => (
+          <a key={x.t} href={x.href} className={`card home-tile ${x.admin ? 'admin' : ''}`}>
+            <b>{x.t}</b><span className="muted small">{x.d}</span>
           </a>
-        </p>
+        ))}
+      </nav>
+
+      <div className="hero home-hero">
+        <h1>Roscommon {grade && grade !== 'Senior' ? grade : ''} {year || ''}</h1>
+        <nav className="toolbar">
+          {grades.length > 1 && <div className="seg">{grades.map((g) => <a key={g} href={homeLink({ grade: g, year: '' })} className={g === grade ? 'on' : ''}>{g}</a>)}</div>}
+          {years.length > 1 && <div className="seg">{years.map((y) => <a key={y} href={homeLink({ year: y })} className={y === year ? 'on' : ''}>{y}</a>)}</div>}
+        </nav>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="card muted">No Roscommon games for this season yet.</p>
+      ) : (
+        <>
+          <div className="home-stats">
+            <div className="card stat"><span className="stat-k">Record</span><b className="num">{rec.W}-{rec.D}-{rec.L}</b><span className="muted small">won, drawn, lost in {rows.length} games</span></div>
+            <div className="card stat"><span className="stat-k">Points a game</span><b className="num">{avg(rows.map((r) => r.f)).toFixed(1)} <small>v</small> {avg(rows.map((r) => r.a)).toFixed(1)}</b><span className="muted small">scored v conceded (goal = 3)</span></div>
+            {tagged.length > 0 && <div className="card stat"><span className="stat-k">Shot conversion</span><b className="num">{usAll.conv ?? '–'}% <small>v</small> {themAll.conv ?? '–'}%</b><span className="muted small">us v opposition, {tagged.length} tagged game{tagged.length === 1 ? '' : 's'}</span></div>}
+            {tagged.length > 0 && usAll.kickouts.retPct != null && <div className="card stat"><span className="stat-k">Own kick-outs won</span><b className="num">{usAll.kickouts.retPct ?? '–'}% <small>v</small> {themAll.kickouts.retPct ?? '–'}%</b><span className="muted small">ours v theirs</span></div>}
+            {tagged.length > 0 && (usAll.turnoversWon + usAll.turnoversLost) > 0 && <div className="card stat"><span className="stat-k">Turnovers a game</span><b className="num">{(usAll.turnoversWon / tagged.length).toFixed(1)} <small>v</small> {(usAll.turnoversLost / tagged.length).toFixed(1)}</b><span className="muted small">won v lost, where tagged</span></div>}
+            <div className="card stat"><span className="stat-k">Form</span>
+              <span className="form-row">{form.map((r) => <a key={r.m.id} href={`/match/${r.m.id}`} className={`badge ${r.res}`} title={`v ${r.opp} ${r.line} (${r.date})`}>{r.res}</a>)}</span>
+              <span className="muted small">last {form.length}, oldest first</span>
+            </div>
+          </div>
+
+          <h2>Trends, game by game</h2>
+          <div className="trend-grid">
+            <TrendChart title="Points scored v conceded" games={chartGames}
+              series={[{ name: 'Roscommon', color: ROS, values: rows.map((r) => r.f) }, { name: 'Opposition', color: OPP, values: rows.map((r) => r.a) }]} />
+            <TrendChart title="Shot conversion" unit="%" min={0} max={100} games={chartGames}
+              series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.conv) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.conv) }]}
+              note={tagged.length < rows.length ? 'Gaps are games without tags.' : null} />
+            {usAll.kickouts.retPct != null && (
+              <TrendChart title="Own kick-outs won" unit="%" min={0} max={100} games={chartGames}
+                series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.kickouts.retPct) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.kickouts.retPct) }]} />
+            )}
+            {usAll.shots > 0 && (
+              <TrendChart title="Shots a game" games={chartGames}
+                series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.shots) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.shots) }]} />
+            )}
+          </div>
+
+          <div className="home-two">
+            <div>
+              <h2>Top scorers</h2>
+              {scorers.length ? (
+                <div className="card">
+                  <table className="nums home-scorers">
+                    <thead><tr><th>Player</th><th>Games</th><th>Score</th><th>Shots</th></tr></thead>
+                    <tbody>
+                      {scorers.map((p) => {
+                        const href = playerHref('Roscommon', p.name, null);
+                        return (
+                          <tr key={p.name}>
+                            <td>{href ? <a href={href}>{p.name}</a> : p.name}</td>
+                            <td>{p.games}</td>
+                            <td><b>{p.goals}-{p.points - 3 * p.goals}</b></td>
+                            <td>{p.scores}/{p.shots}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <p className="muted small">From the tags, {tagged.length} game{tagged.length === 1 ? '' : 's'}.</p>
+                </div>
+              ) : <p className="card muted small">{grade !== 'Senior' && !admin ? 'Names are hidden for this grade.' : 'No scorers named in the tags yet.'}</p>}
+            </div>
+            <div>
+              <h2>Recent games</h2>
+              <div className="game-strip">
+                {recent.map((r) => (
+                  <a key={r.m.id} href={`/match/${r.m.id}`} className={`card game ${r.us ? '' : 'untagged'}`}>
+                    <span className={`badge ${r.res}`}>{r.res}</span>
+                    <span className="game-main"><b>v {r.opp}</b><span className="num">{r.line}</span></span>
+                    <span className="muted small game-meta">{compType(r.m.competitions?.name)} · {r.date}{r.us ? '' : ' · no tags'}</span>
+                  </a>
+                ))}
+              </div>
+              <p className="small"><a href={`/games?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`}>All {grade} {year} games →</a></p>
+            </div>
+          </div>
+        </>
       )}
-
-      {sum.P > 0 && (
-        <div className="card season">
-          <div className="season-label muted small">{who === 'opp' ? team : 'Roscommon'}</div>
-          <div><span className="muted small">Played</span><b>{sum.P}</b></div>
-          <div><span className="muted small">Won</span><b>{sum.W}</b></div>
-          <div><span className="muted small">Drawn</span><b>{sum.D}</b></div>
-          <div><span className="muted small">Lost</span><b>{sum.L}</b></div>
-          <div><span className="muted small">Avg pts for</span><b>{(sum.F / sum.P).toFixed(1)}</b></div>
-          <div><span className="muted small">Avg pts against</span><b>{(sum.A / sum.P).toFixed(1)}</b></div>
-        </div>
-      )}
-
-      {shown.length === 0 && !problem && <p className="muted">No games loaded for this selection yet.</p>}
-
-      {groups.map((g) => (
-        <section key={g.key}>
-          <h2>{g.name}{g.grade && g.grade !== 'Senior' ? <span className="muted"> · {g.grade}</span> : ''}</h2>
-          {g.games.map((m) => {
-            const r = side ? fromOurSide(m, side) : null;
-            const live = isLiveNow(m);
-            return (
-              <a key={m.id} className="card game" href={`/match/${m.id}`}>
-                {live ? <span className="badge live">LIVE</span> : <span className={`badge ${r ? r.res : 'N'}`}>{r ? r.res : '–'}</span>}
-                <span className="game-main">
-                  {r ? (
-                    <>
-                      <b>v {r.them.name}</b>
-                      <span className="num">{score(r.us.g, r.us.p)} – {score(r.them.g, r.them.p)}</span>
-                    </>
-                  ) : (
-                    <>
-                      <b>{m.team1.name} v {m.team2.name}</b>
-                      <span className="num">{score(m.team1_goals, m.team1_points)} – {score(m.team2_goals, m.team2_points)}</span>
-                    </>
-                  )}
-                </span>
-                <span className="muted small game-meta">
-                  {m.stage ? `${m.stage} · ` : ''}
-                  {new Date(m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}
-                  {r && r.diff !== 0 ? ` · ${r.diff > 0 ? '+' : ''}${r.diff}` : ''}
-                </span>
-              </a>
-            );
-          })}
-        </section>
-      ))}
     </>
   );
 }
