@@ -384,3 +384,9 @@ button.primary{background:var(--g);color:#fff}
   header .brand img{height:36px}
   .nav-links{gap:14px;flex-wrap:wrap}
 }
+.live-badge{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;font-size:.85rem;font-weight:600;margin:0 0 8px}
+.live-badge .dot{width:10px;height:10px;border-radius:50%;background:#b8c0d0}
+.live-badge .dot.on{background:#1d9a45;box-shadow:0 0 0 0 rgba(29,154,69,.6);animation:livepulse 2s infinite}
+.live-badge button{background:#eef1f7;padding:4px 10px;font-size:.8rem}
+@keyframes livepulse{70%{box-shadow:0 0 0 8px rgba(29,154,69,0)}100%{box-shadow:0 0 0 0 rgba(29,154,69,0)}}
+.badge.live{background:#1d9a45;color:#fff;font-size:.62rem;letter-spacing:.04em}

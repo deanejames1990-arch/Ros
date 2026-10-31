@@ -7,6 +7,7 @@ import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
 import { PrintButton, SectionImages } from '../../report/Export';
 import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
 import { isLiveCode } from '../../../lib/live';
+import LiveRefresh from './LiveRefresh';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -60,8 +61,12 @@ export default async function Match({ params, searchParams }) {
   const teamHref = (name) => `/team/${encodeURIComponent(name)}?${new URLSearchParams({ grade: m.competitions.grade || 'Senior', year: String(m.competitions.seasons.year) })}`;
   const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
 
+  // A game started in the live tagger on or about today: keep the page updating.
+  const liveNow = isLiveCode(m.match_code) && Math.abs(Date.now() - new Date(m.match_date).getTime()) < 36 * 3600 * 1000;
+
   return (
     <>
+      {liveNow && <LiveRefresh />}
       <p className="muted">
         {role === 'admin' && <span className="no-print">{isLiveCode(m.match_code) && <><a href={`/admin/live/${m.id}`}>Open in live tagger</a> · </>}<a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
         <a href="/">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
