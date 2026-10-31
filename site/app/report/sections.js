@@ -200,6 +200,15 @@ const COLS = [
   { k: 'assists', label: 'Assists' },
 ];
 
+// A player's profile: their saved record if they're on a team sheet, otherwise
+// built from the names in the team's tags. Bare numbers ("14") have no profile.
+export function playerHref(team, name, links) {
+  const id = links?.[String(name).toLowerCase()];
+  if (id) return `/player/${id}`;
+  if (!name || /^#?\d+$/.test(String(name).trim())) return null;
+  return `/team/${encodeURIComponent(team)}/player/${encodeURIComponent(name)}`;
+}
+
 export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false, links = null }) {
   if (hidden) {
     return (
@@ -231,7 +240,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false, l
           <tbody>
             {list.map((p, i) => (
               <tr key={p.name} className={i >= limit ? 'extra' : undefined}>
-                <td>{links?.[p.name.toLowerCase()] ? <a href={`/player/${links[p.name.toLowerCase()]}`}>{p.name}</a> : p.name}</td>
+                <td>{playerHref(T.name, p.name, links) ? <a href={playerHref(T.name, p.name, links)}>{p.name}</a> : p.name}</td>
                 {cols.map((c) => <td key={c.k}>{c.fmt ? c.fmt(p) : p[c.k] || '—'}</td>)}
               </tr>
             ))}
@@ -247,7 +256,7 @@ export function PlayerTable({ T, s, multi = false, limit = 12, hidden = false, l
         From the names on the tags. Pts counts 1 / 2 / 3 per point, two-pointer and goal; att = attempts (scored + missed).
         {list.some((p) => p.twoScored) && !list.some((p) => p.twoTrackedGames) && ' Missed two-point attempts aren’t tagged in this data (n/t), so they count as 1-pt attempts.'}
         {s.total > tagged && ` ${s.total - tagged} of ${T.name}’s ${s.total} points have no shooter tagged.`}
-        {links ? ' Linked names open the player’s profile (from the team sheets).' : ' Add team sheets to link players to their profiles.'}
+        {' '}Click a name for the player’s profile across all their games.
       </p>
     </div>
   );

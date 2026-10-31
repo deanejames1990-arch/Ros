@@ -50,7 +50,8 @@ export default async function TeamReport({ params, searchParams }) {
   const analysed = await Promise.all(inSeason.map(async (m) => {
     const t2 = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const raw = nameEvents(await loadEvents(m.id), (seasonApps || []).filter((a) => a.match_id === m.id), t2);
-    const events = m.competitions?.show_player_names === false ? withoutNames(raw) : raw;
+    // Underage names: admins only.
+    const events = m.competitions?.show_player_names === false && role !== 'admin' ? withoutNames(raw) : raw;
     if (!events.length) return { m, tagged: false };
     const t = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const r = analyseMatch({ events, teams: t });
@@ -190,16 +191,22 @@ export default async function TeamReport({ params, searchParams }) {
           r.games += 1; if (a.started) r.starts += 1; r.goals += a.goals || 0; r.points += a.points || 0; if (a.jersey_no) r.nos.add(a.jersey_no);
           sq.set(a.player_id, r);
         }
+        // Plus everyone named in the tags who isn't on a sheet yet.
+        const onSheet = new Set([...sq.values()].map((r) => r.name.toLowerCase()));
+        for (const pl of a.players || []) {
+          if (onSheet.has(pl.name.toLowerCase()) || /^#?\d+$/.test(pl.name.trim())) continue;
+          sq.set(`tag:${pl.name}`, { id: null, name: pl.name, games: pl.games || 1, starts: null, goals: pl.goals || 0, points: (pl.points || 0) - 3 * (pl.goals || 0), nos: new Set(), fromTags: true });
+        }
         const list = [...sq.values()].sort((x, y) => y.games - x.games || (3 * y.goals + y.points) - (3 * x.goals + x.points) || x.name.localeCompare(y.name));
         if (!list.length) return null;
         return (
           <details className="card squad no-print" open={list.length <= 30}>
-            <summary><b>Squad · {list.length} players on team sheets</b> <span className="muted small">open a player for their profile</span></summary>
+            <summary><b>Squad · {list.length} players</b> <span className="muted small">from team sheets and the names in the tags · open a player for their profile</span></summary>
             <div className="squad-grid">
               {list.map((p) => (
-                <a key={p.id} href={`/player/${p.id}`} className="squad-p">
+                <a key={p.id || p.name} href={p.id ? `/player/${p.id}` : `/team/${encodeURIComponent(teamName)}/player/${encodeURIComponent(p.name)}`} className="squad-p">
                   <b>{p.name}</b>
-                  <span className="muted small">{p.games} game{p.games === 1 ? '' : 's'} · {p.starts} start{p.starts === 1 ? '' : 's'}{p.goals || p.points ? ` · ${score(p.goals, p.points)}` : ''}{p.nos.size ? ` · #${[...p.nos].join('/')}` : ''}</span>
+                  <span className="muted small">{p.games} game{p.games === 1 ? '' : 's'}{p.starts != null ? ` · ${p.starts} start${p.starts === 1 ? '' : 's'}` : ''}{p.goals || p.points ? ` · ${score(p.goals, p.points)}` : ''}{p.nos.size ? ` · #${[...p.nos].join('/')}` : ''}</span>
                 </a>
               ))}
             </div>

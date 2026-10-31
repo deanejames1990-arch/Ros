@@ -20,8 +20,9 @@ const OPP = '#c4572a'; // opposition burnt orange
 export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();
   if (!m) notFound();
-  const showNames = m.competitions.show_player_names;
   const role = await currentRole();
+  // Underage names are hidden from viewers; admins see them.
+  const showNames = m.competitions.show_player_names !== false || role === 'admin';
   const view = searchParams.view === 'analyst' ? 'analyst' : 'coach';
   const period = PERIODS.includes(searchParams.period) ? searchParams.period : 'All';
 
