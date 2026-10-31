@@ -14,6 +14,7 @@ export default async function RootLayout({ children }) {
           {role && (
             <nav className="nav-links">
               <a className="nav" href="/teams">Teams</a>
+              {role === 'admin' && <a className="nav" href="/admin/live">Live tagger</a>}
               {role === 'admin' && <a className="nav" href="/admin/import">Add game</a>}
               {role === 'admin' && <a className="nav" href="/admin">Manage</a>}
               {authEnabled() && <a className="nav" href="/logout">Log out</a>}

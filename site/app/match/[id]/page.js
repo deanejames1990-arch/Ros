@@ -5,6 +5,8 @@ import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
 import { PrintButton, SectionImages } from '../../report/Export';
+import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
+import { isLiveCode } from '../../../lib/live';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -61,7 +63,7 @@ export default async function Match({ params, searchParams }) {
   return (
     <>
       <p className="muted">
-        {role === 'admin' && <span className="no-print"><a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
+        {role === 'admin' && <span className="no-print">{isLiveCode(m.match_code) && <><a href={`/admin/live/${m.id}`}>Open in live tagger</a> · </>}<a href={`/admin/game/${m.id}`}>Edit game</a> · </span>}
         <a href="/">All games</a> · {m.competitions.name} · {m.competitions.seasons.year}{m.stage ? ` · ${m.stage}` : ''} · {m.match_date}
       </p>
       <div className="scoreline" data-export-title={`${A.name} ${score(m.team1_goals, m.team1_points)} – ${score(m.team2_goals, m.team2_points)} ${B.name} · ${m.competitions.name} ${m.competitions.seasons.year}${m.stage ? ` · ${m.stage}` : ''} · ${m.match_date}`}>
@@ -176,6 +178,19 @@ export default async function Match({ params, searchParams }) {
           )}
 
           <ShootingSection A={A} B={B} a={a} b={b} />
+
+          {hasShotMap(r.events) && (
+            <>
+              <h2>Shot maps{period !== 'All' && <span className="muted"> · {period}</span>}</h2>
+              <div className="card">
+                <div className="shotmaps">
+                  <ShotMap events={r.events} teamId={A.id} name={A.name} color={A.color} />
+                  <ShotMap events={r.events} teamId={B.id} name={B.name} color={B.color} />
+                </div>
+                <ShotLegend />
+              </div>
+            </>
+          )}
 
           {period === 'All' && <PeriodSection A={A} B={B} a={a} b={b} />}
 

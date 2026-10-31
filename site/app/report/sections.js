@@ -7,9 +7,9 @@ const pct = (v) => (v == null ? '—' : `${v}%`);
 const rate = (a, b) => (b ? Math.round((100 * a) / b) : null);
 
 // Kick-out landing boxes laid out as on the pitch: 3 columns, 5 rows.
-const GRID = [['2', '3', '4'], ['5', '6', '7'], ['8', '0', '9'], ['10', '11', '12'], ['13', '14', '15']];
+export const GRID = [['2', '3', '4'], ['5', '6', '7'], ['8', '0', '9'], ['10', '11', '12'], ['13', '14', '15']];
 
-function ZoneGrid({ name, zones, color }) {
+export function ZoneGrid({ name, zones, color }) {
   const max = Math.max(1, ...Object.values(zones).map((z) => z.n));
   return (
     <div className="zone-wrap">
