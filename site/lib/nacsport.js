@@ -6,6 +6,9 @@ import { cleanTagName } from './players';
 //   "TA/TB"      categories like "TA POSS", "TB SHOT (P)", "TA KICKOUT"
 //                (TA is Roscommon in the county analysis files)
 //   "HOME/AWAY"  categories like "HOME SHOT", "AWAY KICK OUT", "HOME TURNOVER LOST"
+//   team names   categories like "GALWAY POSS", "DUBLIN KICKOUT" (Hub's default
+//                buttons named after the two teams): read as TA/TB, with the
+//                first-named team in the file name as TA
 //   "OUR/OPP"    categories like "OUR POSSESSION", "OPP SHOT FROM PLAY", "WINBACK",
 //                "TACKLE" (OUR is Roscommon; won/lost is always from our side;
 //                names are always our players; HIGH/MIDDLE/LOW is our end-to-end)
@@ -52,7 +55,7 @@ const title = (s) =>
 const isName = (t) =>
   !KNOWN.has(t) && /^[A-ZÁÉÍÓÚ'’.\- ]+$/i.test(t) && /\s/.test(t.trim()) &&
   !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD|KICKOUT|PASS|POSS|ATT|SCORE|MISS|TURNOVER|WINBACK|UNFORCED|OPP|OUR|SCORABLE|UNSCORABLE|PHASE|PLACED|CHANCE|ATTEMPT|PSR|OPSR|TECHNICAL|TECH|FOULS?|DISSENT|THROW|THIRD)\b/i.test(t);
-const NOT_NAME = /^(SHOT|POINT|GOAL|WIDE|SHORT|SAVE|SAVED|BLOCK|BLOCKED|FREE|MARK|SCORE|MISS|POST|DISCIPLINE|BREACH|SIDELINE|TEAM|FOUL)$/;
+const NOT_NAME = /^(SHOT|POINT|GOAL|WIDE|SHORT|SAVE|SAVED|BLOCK|BLOCKED|FREE|MARK|SCORE|MISS|POST|DISCIPLINE|BREACH|SIDELINE|TEAM|FOUL|ATTEMPT)$/;
 // The OUR/OPP template writes names as "J. CURRAN".
 const isInitialName = (t) => /^[A-Z]{1,2}\.\s?[A-Z][A-Z'’ -]+$/.test(t);
 
@@ -71,6 +74,35 @@ const OUROPP = {
   'SHOT FROM MARK': ['A', 'SHOT (M)'], 'OUR SHOT FROM MARK': ['A', 'SHOT (M)'], 'OPP SHOT FROM MARK': ['B', 'SHOT (M)'],
   'THROW IN WON': ['A', 'THROW IN'], 'THROW IN LOST': ['B', 'THROW IN'],
 };
+// How a possession started, from the buttons on it.
+const POSS_FROM = {
+  ...SOURCES,
+  'OWN KICKOUT': 'Own Kickout', 'OWN KO': 'Own Kickout', 'OPP KICKOUT': 'Opp Kickout', 'OPP KO': 'Opp Kickout',
+  'TURNOVER': 'Turnover', 'THROW UP': 'Throw Up', 'THROW IN': 'Throw Up',
+};
+
+// Hub's default buttons are named after the two teams ("GALWAY POSS",
+// "DUBLIN SHOT (P)"). Finds the two names and which is TA: the first-named
+// team in the file name (or the import form's team A), else the first seen.
+const TEAM_ACTIONS = /^(.+?)\s+(POSS(?:ESSION)?|ATTACK|SHOT(?: \((?:P|F|M)\))?|45|PENALTY|KICK ?OUT|TURNOVER(?: LOST)?|FOUL|FREE WON|CARD|OUT FOR 45|SIDELINE|SOLO AND GO|MARK)$/;
+function teamPrefixes(meds, names, fileName) {
+  const seen = new Map();
+  for (const m of meds) {
+    const c = String(m.Categoria || '').trim().toUpperCase();
+    if (/^(TA|TB|HOME|AWAY|OUR|OPP|OPPONENT)\s/.test(c)) return null; // a known template
+    const x = c.match(TEAM_ACTIONS);
+    if (x) seen.set(x[1], (seen.get(x[1]) || 0) + 1);
+  }
+  const top = [...seen].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
+  if (top.length !== 2) return null;
+  const g = guessFromName(fileName);
+  const is = (pre, name) => name && pre.toLowerCase() === String(name).trim().toLowerCase();
+  let a = top.find((p) => is(p, g.home)) || top.find((p) => is(p, names?.A));
+  if (!a) a = top.find((p) => !is(p, g.away) && !is(p, names?.B)) || top[0];
+  const b = top.find((p) => p !== a);
+  return { map: { [a]: 'TA', [b]: 'TB' }, names: { A: title(a), B: title(b) } };
+}
+
 const OUROPP_SKIP = /^(OUR|OPP) KO RESULT$/;
 
 // "PS OUR KICKOUT", "OPS OPP TO", "WINBACK SO"... -> a possession source, from the side's view.
@@ -156,12 +188,24 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   const tabs = readTables(json);
   const video = (tabs.Videos || [])[0] || {};
   const fps = Number(video.fps) > 0 ? Number(video.fps) : 25;
-  const meds = [...tabs.Mediciones].sort((a, b) => a.TI - b.TI || a['Id_Medición'] - b['Id_Medición']);
+  let meds = [...tabs.Mediciones].sort((a, b) => a.TI - b.TI || a['Id_Medición'] - b['Id_Medición']);
   const tags = new Map();
   for (const d of tabs.DesTex || []) {
     const k = d.idm;
     if (!tags.has(k)) tags.set(k, []);
     tags.get(k).push(String(d.DesTexto || '').trim().toUpperCase());
+  }
+
+  // Categories named after the teams ("GALWAY POSS"): rename them TA / TB.
+  const teamSides = teamPrefixes(meds, names, fileName);
+  if (teamSides) {
+    const swap = (x) => {
+      const u = String(x || '').trim().toUpperCase();
+      for (const [pre, tag] of Object.entries(teamSides.map)) if (u.startsWith(`${pre} `)) return `${tag} ${u.slice(pre.length + 1)}`;
+      return u;
+    };
+    meds = meds.map((m) => ({ ...m, Categoria: swap(m.Categoria) }));
+    for (const [k, list] of tags) tags.set(k, list.map(swap));
   }
   // "RONAN FOX - TECHNICAL FOUL" -> "RONAN FOX" (the descriptor isn't part of the name).
   const tagsOf = (m) => (tags.get(m['Id_Medición']) || []).map((x) => {
@@ -170,13 +214,14 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   });
 
   const cats = new Set(meds.map((m) => m.Categoria));
+  const teamTemplate = Boolean(teamSides);
   const template = [...cats].some((c) => /^T[AB]\s/.test(c)) ? 'TA/TB'
     : [...cats].some((c) => /^(HOME|AWAY)\s/.test(c)) ? 'HOME/AWAY'
     : [...cats].some((c) => /^(OUR|OPP|OPPONENT)\s/.test(String(c).toUpperCase())) ? 'OUR/OPP' : 'Unknown';
 
   // ---- Halves and quarters -------------------------------------------------
   const obs = (m) => String(m.Observacion || '').toUpperCase();
-  const throwIns = meds.filter((m) => m.Categoria === 'THROW IN').map((m) => m.TI);
+  const throwIns = meds.filter((m) => m.Categoria === 'THROW IN' || /^P[12] START$/.test(m.Categoria)).map((m) => m.TI);
   const markers = meds.filter((m) => /PERIOD|Q[1-4]/.test(obs(m)));
   const markerAt = (re) => markers.find((m) => re.test(obs(m)))?.TI;
 
@@ -202,6 +247,9 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   const halfEnd = [1, 2].map((h) => Math.max(...meds.filter((m) => halfOf(m) === h).map((m) => m.TI), 0));
   const qMarks = { Q2: markerAt(/Q2 BEGINS|Q2 STARTS/), Q4: markerAt(/Q4 BEGINS|Q4 STARTS/) };
   const quarterOf = (m) => {
+    // Quarter buttons (Q1–Q4) on the event itself win.
+    const tq = teamTemplate && tagsOf(m).find((x) => /^Q[1-4]$/.test(x));
+    if (tq) return tq;
     const h = halfOf(m);
     const start = h === 1 ? halfStarts[0] : halfStarts[1] ?? halfStarts[0];
     const mid = h === 1 ? qMarks.Q2 : qMarks.Q4;
@@ -221,7 +269,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
 
   for (const m of meds) {
     const cat = String(m.Categoria || '').trim().toUpperCase();
-    if (!cat || SKIP_CATS.test(cat)) continue;
+    if (!cat || SKIP_CATS.test(cat) || /^P[12] START$/.test(cat)) continue; // half markers, read above
     if (template === 'OUR/OPP' && OUROPP_SKIP.test(cat)) continue;
     let t = tagsOf(m);
     const ouropp = template === 'OUR/OPP';
@@ -230,7 +278,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     let note = obs(m).replace(/\s+/g, ' ').trim();
     const notePrefix = {};
     for (;;) {
-      const pm = note.match(/^(2\s?PT(?:\s?SHOT)?|2\s?POINT(?:ER)?(?:\s?ATTEMPT)?|FROM 45'?|FROM FREE|FROM MARK|45'?|FREE|MARK)(?:\s+(.*))?$/);
+      const pm = note.match(/^(2\s?PT(?:\s?(?:SHOT|ATTEMPT))?|2\s?POINT(?:ER)?(?:\s?ATTEMPT)?|FROM 45'?|FROM FREE|FROM MARK|45'?|FREE|MARK)(?:\s+(.*))?$/);
       if (!pm) break;
       const k = pm[1];
       if (/^2/.test(k)) notePrefix.two = true;
@@ -247,6 +295,10 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     // A lone surname on a shot ("MCDONALD") is kept and matched to a full name later.
     if (!ouropp && !players.length && /^SHOT\b|\bSHOT$/.test(cat.replace(/^(TA|TB|HOME|AWAY)\s+/, ''))
       && /^[A-Z'’-]{3,}$/.test(note) && !KNOWN.has(note) && !NOT_NAME.test(note)) players = [title(note)];
+
+    // Jersey numbers as buttons ("P13"): the shooter's number, named or not.
+    const jersey = teamTemplate ? t.map((x) => x.match(/^P(\d{1,2})$/)).find(Boolean) : null;
+    if (jersey && !players.length) players = [`#${Number(jersey[1])}`];
 
     let side = null, rest = cat, ooType = null, winback = false;
     const sm = cat.match(/^(TA|TB|HOME|AWAY)\s+(.*)$/);
@@ -296,12 +348,17 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     if (boxTag) ev.labels.Zone = title(boxTag);
 
     if (players.length) { ev.player_no = players[0]; ev.labels.Players = players.join(', '); }
+    if (jersey) ev.labels.Jersey = Number(jersey[1]);
 
-    if (rest === 'POSS') {
+    if (rest === 'POSS' || rest === 'POSSESSION') {
       ev.event_type = 'Poss';
+      const from = t.find((x) => POSS_FROM[x]);
+      if (from && !ev.labels.PossFrom) ev.labels.PossFrom = POSS_FROM[from];
     } else if (rest === 'ATTACK') {
       ev.event_type = 'Attack';
-    } else if (/^SHOT\b|^45$/.test(rest)) {
+    } else if (/^SHOT\b|^45$|^PENALTY$/.test(rest)) {
+      const pen = rest === 'PENALTY';
+      if (pen) rest = 'SHOT (F)';
       if (notePrefix.f45) rest = '45';
       else if (notePrefix.mark) rest = 'SHOT (M)';
       else if (notePrefix.free && !/\(F\)/.test(rest)) t = [...t, 'FROM FREE'];
@@ -315,7 +372,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
         : missTag ? title(missTag.replace(/^(SHORT_SAVE_BLOCK|SAVE_BLK_SHORT)$/, 'Short/Save/Block')) : 'No score';
       if (!scored && (t.includes('2 POINT') || t.includes('2 POINT ATTEMPT') || notePrefix.two)) ev.labels.Attempt = '2 Point';
       if (t.includes('GOAL CHANCE')) ev.labels.GoalChance = 'Yes';
-      let src = rest === '45' ? '45' : mark ? 'Mark' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
+      let src = pen ? 'Penalty' : rest === '45' ? '45' : mark ? 'Mark' : /\(F\)/.test(rest) ? 'Free' : SOURCES[t.find((x) => SOURCES[x])] || ev.labels.Source;
       // The HOME/AWAY template only marks frees, so everything else is open play.
       if (!src && template === 'HOME/AWAY') src = 'From play';
       if (src) ev.labels.Source = src;
@@ -343,6 +400,7 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       ev.outcome = winner ? `${names[winner]} ${how || 'Unspecified'}` : null;
       const len = t.find((x) => /^(OPP )?(KO )?(LONG|SHORT|MEDIUM)( KO| KICKOUT)?$/.test(x));
       if (len) ev.labels.KickoutDistance = len.replace(/^(OPP )?(KO )?/, '')[0] + 'KO';
+      else if (t.some((x) => /^[SML]KO$/.test(x))) ev.labels.KickoutDistance = t.find((x) => /^[SML]KO$/.test(x));
       const setup = t.find((x) => /^\d-\d/.test(x));
       if (setup) ev.labels.Setup = title(setup);
       if (!winner) warnings.push(`Kick-out at ${ev.minute}′ (${ev.half}) has no winner tagged.`);
@@ -373,6 +431,20 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
       unmapped.add(cat);
     }
     events.push(ev);
+  }
+
+  // Number-only tags ("P13") take the name tagged with that number elsewhere in
+  // the file, when it's always the same name.
+  const byJersey = new Map();
+  for (const e of events) {
+    const no = e.labels?.Jersey;
+    if (!no || !e.side || !e.player_no || String(e.player_no).startsWith('#')) continue;
+    const k = `${e.side}:${no}`;
+    byJersey.set(k, byJersey.has(k) && byJersey.get(k) !== e.player_no ? null : e.player_no);
+  }
+  for (const e of events) {
+    const name = e.labels?.Jersey && byJersey.get(`${e.side}:${e.labels.Jersey}`);
+    if (name && String(e.player_no || '').startsWith('#')) { e.player_no = name; e.labels.Players = name; }
   }
 
   // Lone surnames: if exactly one full name on the same side ends with it, use that.
@@ -408,7 +480,8 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
   else if (!markers.length && halfTagged && !throwIns.length) warnings.push('Halves come from the 1st/2nd half tags; quarters are each half split in two.');
 
   return {
-    template,
+    template: teamSides ? 'Team names' : template,
+    sideNames: teamSides ? teamSides.names : null,
     fps,
     events,
     score: tally,
