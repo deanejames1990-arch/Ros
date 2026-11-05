@@ -544,3 +544,7 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .q-cell b{font-size:1.2rem}
 .q-cell b small{font-size:.75rem;color:var(--mut);font-weight:600}
 @media (max-width:640px){.q-strip{grid-template-columns:repeat(2,1fr)}}
+.q-record{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.q-record span{background:#f7f9fc;border-radius:8px;padding:5px 10px;font-size:.88rem}
+.q-record span.up{background:#e3f1e5}
+.q-record span.down{background:#f6dede}

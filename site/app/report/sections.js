@@ -241,21 +241,35 @@ export function ShootingSection({ A, B, a, b }) {
   );
 }
 
-export function PeriodSection({ A, B, a, b, unit = 'quarters' }) {
+// perGame: [{ mine, opp }] (byTeam entries) when several games are added up, so
+// quarters won are counted game by game rather than from the totals.
+export function PeriodSection({ A, B, a, b, unit = 'quarters', perGame = null }) {
   const ra = unit === 'halves' ? a.halves : a.quarters;
   const rb = unit === 'halves' ? b.halves : b.quarters;
   const word = unit === 'halves' ? 'half' : 'quarter';
   const rows = (f, extra = {}) => ra.map((r, i) => ({ label: r.key, a: r[f], b: rb[i][f], ...extra(r, rb[i]) }));
   const won = ra.map((r, i) => (r.points > rb[i].points ? A.name : r.points < rb[i].points ? B.name : null));
   const aWins = won.filter((w) => w === A.name).length, bWins = won.filter((w) => w === B.name).length;
+  // Several games: count each game's quarters.
+  const games = perGame && perGame.length > 1 ? perGame.filter((g) => g.mine && g.opp) : null;
+  const key = unit === 'halves' ? 'halves' : 'pss';
+  const byQ = games ? ra.map((r, i) => {
+    let w = 0, l = 0, d = 0;
+    for (const g of games) {
+      const x = g.mine[key]?.[i]?.points || 0, y = g.opp[key]?.[i]?.points || 0;
+      if (x > y) w += 1; else if (x < y) l += 1; else d += 1;
+    }
+    return { key: r.key, w, l, d };
+  }) : null;
+  const tot = byQ ? byQ.reduce((t, q) => ({ w: t.w + q.w, l: t.l + q.l, d: t.d + q.d }), { w: 0, l: 0, d: 0 }) : null;
   return (
     <>
       <h2>{unit === 'halves' ? 'Half by half' : 'Quarter by quarter'}</h2>
       <div className="card">
         <Versus a={A} b={B} rows={[
-          { heading: `Points scored in the ${word}` },
+          { heading: `Points scored in the ${word}${games ? ` (total over ${games.length} games)` : ''}` },
           ...rows('points', () => ({})),
-          { heading: `Shots taken in the ${word}` },
+          { heading: `Shots taken in the ${word}${games ? ' (total)' : ''}` },
           ...rows('shots', () => ({})),
           { heading: `Own kick-outs retained in the ${word}` },
           ...ra.map((r, i) => ({
@@ -263,9 +277,22 @@ export function PeriodSection({ A, B, a, b, unit = 'quarters' }) {
             aNote: `${r.koWon} of ${r.koTotal}`, bNote: `${rb[i].koWon} of ${rb[i].koTotal}`,
           })),
         ]} />
-        <p className="takeaway">
-          {A.name} outscored {B.name} in {aWins} of {ra.length} {word === 'half' ? 'halves' : 'quarters'}; {B.name} won {bWins}.
-        </p>
+        {byQ ? (
+          <>
+            <p className="takeaway">
+              Game by game, {A.name} won {tot.w} of {tot.w + tot.l + tot.d} {word === 'half' ? 'halves' : 'quarters'}, lost {tot.l}{tot.d ? ` and drew ${tot.d}` : ''}.
+            </p>
+            <div className="q-record">
+              {byQ.map((q) => (
+                <span key={q.key} className={q.w > q.l ? 'up' : q.w < q.l ? 'down' : ''}><b>{q.key}</b> won {q.w}, lost {q.l}{q.d ? `, drew ${q.d}` : ''}</span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="takeaway">
+            {A.name} outscored {B.name} in {aWins} of {ra.length} {word === 'half' ? 'halves' : 'quarters'}; {B.name} won {bWins}.
+          </p>
+        )}
       </div>
     </>
   );

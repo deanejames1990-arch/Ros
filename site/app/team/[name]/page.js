@@ -238,7 +238,7 @@ export default async function TeamReport({ params, searchParams }) {
             <QuarterTargets name={teamName} t={targetFor(grade)} games={tagged.filter((d) => d.mine.possessions > 0).length}
               quarters={tagged.filter((d) => d.mine.possessions > 0).flatMap((d) => d.mine.pss)} />
           )}
-          <PeriodSection A={A} B={B} a={a} b={b} />
+          <PeriodSection A={A} B={B} a={a} b={b} perGame={tagged.map((d) => ({ mine: d.mine, opp: d.opp }))} />
           <TurnoverSection A={A} B={B} a={a} />
           <h2>{teamName} players</h2>
           <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} links={(() => {
