@@ -7,7 +7,7 @@ import { targetFor } from '../../../lib/targets';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
-import { nameEvents } from '../../../lib/players';
+import { nameEvents, isNumberTag } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
 import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 
@@ -200,7 +200,7 @@ export default async function TeamReport({ params, searchParams }) {
         // Plus everyone named in the tags who isn't on a sheet yet.
         const onSheet = new Set([...sq.values()].map((r) => r.name.toLowerCase()));
         for (const pl of a.players || []) {
-          if (onSheet.has(pl.name.toLowerCase()) || /^#?\d+$/.test(pl.name.trim())) continue;
+          if (onSheet.has(pl.name.toLowerCase()) || isNumberTag(pl.name)) continue;
           sq.set(`tag:${pl.name}`, { id: null, name: pl.name, games: pl.games || 1, starts: null, goals: pl.goals || 0, points: (pl.points || 0) - 3 * (pl.goals || 0), nos: new Set(), fromTags: true });
         }
         const list = [...sq.values()].sort((x, y) => y.games - x.games || (3 * y.goals + y.points) - (3 * x.goals + x.points) || x.name.localeCompare(y.name));

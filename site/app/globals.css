@@ -559,3 +559,5 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .search select{font:inherit;padding:9px;border:1px solid #cfd6e4;border-radius:8px}
 .h2-link{margin-left:12px;font-weight:600;font-family:var(--font);font-size:.85rem}
 .alias-table tr.todo td:first-child{border-left:4px solid var(--gold)}
+.num-chip{display:inline-block;background:#eef1f7;border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0;font-weight:700}
+.num-chip small{font-weight:500;color:var(--mut)}

@@ -3,6 +3,7 @@
 // analyseMatch, or the result of combineSides.
 import { Versus } from '../match/[id]/charts';
 import { hit, hitRates, targetText } from '../../lib/targets';
+import { isNumberTag } from '../../lib/players';
 
 // "12-8-6" with each part marked against the quarter target (when there is one).
 export function Pss({ q, t, showPoss = true }) {
@@ -356,7 +357,7 @@ const COLS = [
 export function playerHref(team, name, links) {
   const id = links?.[String(name).toLowerCase()];
   if (id) return `/player/${id}`;
-  if (!name || /^#?\d+$/.test(String(name).trim())) return null;
+  if (!name || isNumberTag(name)) return null;
   return `/team/${encodeURIComponent(team)}/player/${encodeURIComponent(name)}`;
 }
 

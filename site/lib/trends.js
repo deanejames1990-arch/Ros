@@ -165,7 +165,7 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
       const v = shotValue(e);
       r.shots += 1; r.pts += v; if (v) r.scores += 1; if (v === 3) r.goals += 1;
       if (v && recentE) { r.recent += 1; r.recentPts += v; }
-    } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy')) {
+    } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy') && !/^(team\s*)?[ab]$/i.test(String(lbl(e, 'FreeWonBy')))) {
       const r = prow(other(e.team_id), lbl(e, 'FreeWonBy'));
       if (r) { r.freesWon += 1; if (recentE) r.recent += 1; }
     } else if (e.event_type === 'Turnover' && lbl(e, 'WonBackBy')) {

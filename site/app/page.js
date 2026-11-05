@@ -1,6 +1,6 @@
 import { db, MATCH_SELECT, loadEvents } from '../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../lib/analysis';
-import { nameEvents } from '../lib/players';
+import { nameEvents, isNumberTag } from '../lib/players';
 import { getAliases } from '../lib/aliases';
 import { isLiveNow } from '../lib/live';
 import { currentAccess, gradeOk } from '../lib/session';
@@ -95,7 +95,7 @@ export default async function Home({ searchParams }) {
   const rec = { W: rows.filter((r) => r.res === 'W').length, D: rows.filter((r) => r.res === 'D').length, L: rows.filter((r) => r.res === 'L').length };
   const chartGames = rows.map((r) => ({ id: r.m.id, short: r.short, opp: r.opp, date: r.date }));
   const tg = (fn) => rows.map((r) => (r.us ? fn(r) : null));
-  const scorers = (usAll.players || []).filter((p) => p.points > 0 && !/^#?\d+$/.test(p.name)).slice(0, 6);
+  const scorers = (usAll.players || []).filter((p) => p.points > 0 && !isNumberTag(p.name)).slice(0, 6);
   const homeLink = (o) => `/?${new URLSearchParams({ ...(o.grade ?? grade ? { grade: o.grade ?? grade } : {}), ...(o.year ?? year ? { year: String(o.year ?? year) } : {}) })}`;
   const recent = [...rows].reverse().slice(0, 5);
   const form = [...rows].slice(-5);

@@ -1,6 +1,6 @@
 import { db, loadEvents } from '../../../lib/db';
 import { analyseMatch } from '../../../lib/analysis';
-import { nameEvents } from '../../../lib/players';
+import { nameEvents, isNumberTag } from '../../../lib/players';
 import { getAliases, ALIAS_SQL } from '../../../lib/aliases';
 import NameRows from './NameRows';
 
@@ -16,7 +16,7 @@ export default async function TidyNames({ searchParams }) {
   const { data: teams } = await db.from('teams').select('id, name').order('name');
   const team = (teams || []).find((t) => t.name.toLowerCase() === String(searchParams.team || '').toLowerCase());
 
-  let rows = [], squad = [];
+  let rows = [], squad = [], byNumber = [];
   if (team && !missing) {
     const [{ data: games }, { data: apps }, aliases] = await Promise.all([
       db.from('matches').select('id, match_date, team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
@@ -32,8 +32,13 @@ export default async function TidyNames({ searchParams }) {
       const raw = await loadEvents(m.id);
       if (!raw.length) return;
       const r = analyseMatch({ events: nameEvents(raw, (apps || []).filter((a) => a.match_id === m.id), ts), teams: ts });
+      const opp = m.team1_id === team.id ? m.team2.name : m.team1.name;
+      const nums = [];
       for (const p of r.byTeam[team.id]?.players || []) {
-        if (/^#?\d+$/.test(p.name)) continue;
+        if (isNumberTag(p.name)) {
+          nums.push({ no: p.name, tags: p.shots + p.poss + p.koWon + p.freesWon + p.winbacks + p.turnoversLost + p.tackles + p.assists, points: p.points });
+          continue;
+        }
         const k = p.name.toLowerCase();
         const o = seen.get(k) || { name: p.name, games: 0, points: 0, shots: 0, actions: 0, last: '' };
         o.games += 1; o.points += p.points; o.shots += p.shots;
@@ -41,7 +46,9 @@ export default async function TidyNames({ searchParams }) {
         if (m.match_date > o.last) o.last = m.match_date;
         seen.set(k, o);
       }
+      if (nums.length) byNumber.push({ id: m.id, date: m.match_date, opp, nums: nums.sort((a, b) => b.tags - a.tags) });
     }));
+    byNumber.sort((a, b) => b.date.localeCompare(a.date));
     const squadMap = new Map();
     for (const a of apps || []) if (a.players?.name) squadMap.set(a.players.name.toLowerCase(), a.players.name);
     squad = [...new Set([...squadMap.values(), ...mine.map((a) => a.name)])].sort();
@@ -84,6 +91,31 @@ export default async function TidyNames({ searchParams }) {
             rows.length
               ? <NameRows teamId={team.id} teamName={team.name} rows={rows} squad={squad} />
               : <p className="card muted">No names in {team.name}’s tags yet.</p>
+          )}
+          {team && byNumber.length > 0 && (
+            <>
+              <h2>Tagged by number</h2>
+              <div className="card">
+                <p className="small">
+                  These are jersey numbers (P13, No 9…), so they mean a different player from game to game. Fill in the team sheet for each game and
+                  every number in it gets that player’s name: in the dashboards, reports and their profile.
+                </p>
+                <div className="wrap">
+                  <table className="alias-table">
+                    <thead><tr><th>Game</th><th>Numbers with no name yet</th><th /></tr></thead>
+                    <tbody>
+                      {byNumber.map((g) => (
+                        <tr key={g.id} className="todo">
+                          <td><b>v {g.opp}</b><div className="muted small">{new Date(g.date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })}</div></td>
+                          <td>{g.nums.map((n) => <span key={n.no} className="num-chip">{n.no}<small> {n.tags} tag{n.tags === 1 ? '' : 's'}{n.points ? `, ${n.points} pts` : ''}</small></span>)}</td>
+                          <td><a href={`/admin/game/${g.id}#sheets`}>Fill team sheet</a></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </>
       )}

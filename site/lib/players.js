@@ -5,7 +5,12 @@
 // are given the name of whoever wore that number for that team that day.
 
 const lbl = (e, k) => e.labels?.[k];
-const NUM = /^#?(\d{1,2})$/;
+// A jersey number rather than a name: "13", "#13", "P13", "No 13", "No. 13".
+const NUM = /^(?:#|p|no\.?|n)?\s*(\d{1,2})$/i;
+export const isNumberTag = (name) => NUM.test(String(name || '').trim());
+// Imported files mark who won a free with the side letter (A / B), not a name.
+export const isSideTag = (v) => /^(team\s*)?[ab]$/i.test(String(v || '').trim());
+export const numberOf = (name) => { const m = String(name || '').trim().match(NUM); return m ? Number(m[1]) : null; };
 
 // apps: [{ team_id, jersey_no, players: { name } }]; teams: [{ id, name }]
 // aliases: [{ team_id, alias, name }] from Tidy names ("Lundy" -> "Ciarán Lundy").
@@ -13,8 +18,7 @@ export function nameEvents(events, apps, teams, aliases = []) {
   const byNo = new Map((apps || []).filter((a) => a.jersey_no && a.players?.name).map((a) => [`${a.team_id}:${a.jersey_no}`, a.players.name]));
   const ids = new Set(teams.map((t) => t.id));
   const byAlias = new Map((aliases || []).filter((a) => ids.has(a.team_id)).map((a) => [`${a.team_id}:${String(a.alias).trim().toLowerCase()}`, a.name]));
-  if (!byNo.size && !byAlias.size) return events;
-  const named = byNo.size ? numbersToNames(events, byNo, teams) : events;
+  const named = numbersToNames(events, byNo, teams); // also writes P13 / No 13 as #13
   return byAlias.size ? applyAliases(named, byAlias, teams) : named;
 }
 
@@ -41,12 +45,12 @@ function applyAliases(events, byAlias, teams) {
     const own = e.event_type === 'Kickout' ? winnerOf(e) : e.event_type === 'Foul' && l.FreeWonBy ? other(e.team_id) : e.team_id;
     if (labels.Players) { const v = fix(labels.Players, own); if (v !== labels.Players) { labels.Players = v; changed = true; } }
     // Some files put the name in player_no too (it's read first for shots).
-    if (playerNo && !/^#?\d+$/.test(String(playerNo))) {
+    if (playerNo && !isNumberTag(playerNo)) {
       const v = fix(playerNo, own);
       if (v !== String(playerNo)) { if (!labels.Players) labels.Players = v; playerNo = v; changed = true; }
     }
     for (const k of ['WonBackBy', 'FreeWonBy']) {
-      if (!labels[k]) continue;
+      if (!labels[k] || isSideTag(labels[k])) continue;
       const v = fix(labels[k], other(e.team_id));
       if (v !== labels[k]) { labels[k] = v; changed = true; }
     }
@@ -63,7 +67,7 @@ function numbersToNames(events, byNo, teams) {
   };
   const fix = (value, teamId) => String(value).split(',').map((x) => {
     const m = x.trim().match(NUM);
-    return m ? byNo.get(`${teamId}:${Number(m[1])}`) || x.trim() : x.trim();
+    return m ? byNo.get(`${teamId}:${Number(m[1])}`) || `#${Number(m[1])}` : x.trim();
   }).join(', ');
   return events.map((e) => {
     const labels = { ...(e.labels || {}) };
@@ -72,7 +76,7 @@ function numbersToNames(events, byNo, teams) {
     const own = e.event_type === 'Kickout' ? winnerOf(e) : e.team_id;
     // Live tags keep the number they were tagged with: the sheet decides the name.
     const jersey = Number(labels.Jersey) || null;
-    const field = labels.WonBackBy ? 'WonBackBy' : labels.FreeWonBy ? 'FreeWonBy' : 'Players';
+    const field = labels.WonBackBy ? 'WonBackBy' : labels.FreeWonBy && !isSideTag(labels.FreeWonBy) ? 'FreeWonBy' : 'Players';
     const sheetName = jersey && byNo.get(`${field === 'Players' ? own : other(e.team_id)}:${jersey}`);
     if (sheetName && labels[field] !== sheetName) {
       labels[field] = sheetName;
@@ -83,11 +87,12 @@ function numbersToNames(events, byNo, teams) {
       const v = fix(labels.Players, own);
       if (v !== labels.Players) { labels.Players = v; changed = true; }
     } else if (playerNo && NUM.test(String(playerNo))) {
-      const name = byNo.get(`${own}:${Number(String(playerNo).replace('#', ''))}`);
-      if (name) { labels.Players = name; playerNo = null; changed = true; }
+      // A number only: the sheet's name for it, else written as "#13".
+      labels.Players = byNo.get(`${own}:${numberOf(playerNo)}`) || `#${numberOf(playerNo)}`;
+      playerNo = null; changed = true;
     }
     for (const k of ['WonBackBy', 'FreeWonBy']) {
-      if (!labels[k]) continue;
+      if (!labels[k] || isSideTag(labels[k])) continue;
       const v = fix(labels[k], other(e.team_id));
       if (v !== labels[k]) { labels[k] = v; changed = true; }
       if (k === 'FreeWonBy' && labels.Players !== labels[k]) { labels.Players = labels[k]; changed = true; }
