@@ -96,11 +96,37 @@ function teamPrefixes(meds, names, fileName) {
   const top = [...seen].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
   if (top.length !== 2) return null;
   const g = guessFromName(fileName);
-  const is = (pre, name) => name && pre.toLowerCase() === String(name).trim().toLowerCase();
+  // The team each button prefix stands for: a full name ("GALWAY"), or an
+  // abbreviation ("GAL", "DUB") matched to the teams in the file name first,
+  // then to the counties.
+  const hints = [g.home, g.away, names?.A, names?.B].filter((x) => x && !/^Team [AB]$/.test(x));
+  const full = Object.fromEntries(top.map((p) => [p, teamFor(p, hints)]));
+  const is = (pre, name) => name && full[pre].toLowerCase() === String(name).trim().toLowerCase();
   let a = top.find((p) => is(p, g.home)) || top.find((p) => is(p, names?.A));
   if (!a) a = top.find((p) => !is(p, g.away) && !is(p, names?.B)) || top[0];
   const b = top.find((p) => p !== a);
-  return { map: { [a]: 'TA', [b]: 'TB' }, names: { A: title(a), B: title(b) } };
+  return { map: { [a]: 'TA', [b]: 'TB' }, names: { A: full[a], B: full[b] } };
+}
+
+// Common county abbreviations on tagging buttons.
+const COUNTY_ABBR = {
+  ANT: 'Antrim', ARM: 'Armagh', CAR: 'Carlow', CLW: 'Carlow', CAV: 'Cavan', CLA: 'Clare', COR: 'Cork', DER: 'Derry', LDY: 'Derry',
+  DON: 'Donegal', DGL: 'Donegal', DOW: 'Down', DUB: 'Dublin', FER: 'Fermanagh', GAL: 'Galway', GAY: 'Galway', KER: 'Kerry',
+  KDA: 'Kildare', KIL: 'Kildare', KILD: 'Kildare', KK: 'Kilkenny', KIK: 'Kilkenny', LAO: 'Laois', LEI: 'Leitrim', LEIT: 'Leitrim',
+  LIM: 'Limerick', LFD: 'Longford', LOG: 'Longford', LOU: 'Louth', MAY: 'Mayo', MEA: 'Meath', MON: 'Monaghan', OFF: 'Offaly',
+  ROS: 'Roscommon', RCOM: 'Roscommon', SLI: 'Sligo', SLIG: 'Sligo', TIP: 'Tipperary', TYR: 'Tyrone', WAT: 'Waterford',
+  WMH: 'Westmeath', WES: 'Westmeath', WEX: 'Wexford', WIC: 'Wicklow', NY: 'New York', LDN: 'London',
+};
+function teamFor(prefix, hints = []) {
+  const p = prefix.trim().toLowerCase();
+  const exact = [...hints, ...COUNTIES].find((x) => x.toLowerCase() === p);
+  if (exact) return exact;
+  // An abbreviation of one of the teams in this game ("DUB" for Dublin).
+  const hint = p.length >= 2 && hints.find((x) => x.toLowerCase().replace(/\s+/g, '').startsWith(p.replace(/\s+/g, '')));
+  if (hint) return hint;
+  if (COUNTY_ABBR[prefix.toUpperCase()]) return COUNTY_ABBR[prefix.toUpperCase()];
+  const starts = p.length >= 3 ? COUNTIES.filter((x) => x.toLowerCase().startsWith(p)) : [];
+  return starts.length === 1 ? starts[0] : title(prefix);
 }
 
 const OUROPP_SKIP = /^(OUR|OPP) KO RESULT$/;
