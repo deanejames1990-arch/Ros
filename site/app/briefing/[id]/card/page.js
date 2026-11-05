@@ -8,6 +8,7 @@ import { getCrests } from '../../../../lib/crests';
 import { quarterTrend } from '../../../../lib/pss';
 import { targetFor } from '../../../../lib/targets';
 import CardView from './CardView';
+import { suggestKeyMessages } from '../../../../lib/briefing-suggest';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Briefing infographic · James Deane Analysis' };
@@ -58,7 +59,9 @@ export default async function BriefingCard({ params }) {
       date: new Date(r.m.match_date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' }),
       opp: r.oppName, res: r.res, line: r.line,
     })),
-    messages: lines(b.notes?.summary).slice(0, 4),
+    // Your key messages; until there are any, the top suggested ones (flagged on the page).
+    messages: lines(b.notes?.summary).length ? lines(b.notes?.summary).slice(0, 4) : suggestKeyMessages(d, quarterTrend).slice(0, 4).map((x) => x.text),
+    suggested: !lines(b.notes?.summary).length,
     perGame: n ? {
       points: one(mine.total / n), against: one(opp.total / n), scores: one(mine.scores / n), shots: one(mine.shots / n),
       poss: mine.possessions ? one(mine.possessions / n) : null, conv: mine.conv,

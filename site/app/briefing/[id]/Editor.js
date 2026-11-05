@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { saveBriefing, deleteBriefing } from '../actions';
 
@@ -8,8 +9,31 @@ function Save() {
   return <button type="submit" className="primary" disabled={pending}>{pending ? 'Saving…' : 'Save briefing'}</button>;
 }
 
-export default function Editor({ b, candidates, sections }) {
+// Proposed key messages from the numbers: tap to add one to the box.
+function Suggestions({ list, box }) {
+  const [used, setUsed] = useState(() => new Set());
+  if (!list?.length) return <p className="muted small">No standout numbers to suggest from these games yet.</p>;
+  const add = (t) => {
+    const el = box.current;
+    if (!el) return;
+    el.value = el.value.trim() ? `${el.value.trimEnd()}\n${t}` : t;
+    setUsed((u) => new Set([...u, t]));
+  };
+  return (
+    <div className="brief-sugg">
+      <div className="small"><b>Suggested from the numbers</b> <span className="muted">· tap to add, then edit the wording</span></div>
+      {list.map((s) => (
+        <button key={s.text} type="button" className={used.has(s.text) ? 'used' : ''} disabled={used.has(s.text)} onClick={() => add(s.text)} title={s.why}>
+          <span>{used.has(s.text) ? '✓' : '+'}</span> {s.text} <small className="muted">({s.why})</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function Editor({ b, candidates, sections, suggestions = [] }) {
   const [state, action] = useFormState(saveBriefing.bind(null, b.id), null);
+  const summaryBox = useRef(null);
   return (
     <form action={action} className="card brief-editor no-print">
       <div className="brief-ed-head">
@@ -33,7 +57,8 @@ export default function Editor({ b, candidates, sections }) {
           {sections.map(([k, t]) => (
             <div key={k} className="brief-note">
               <b>{t}</b>
-              <textarea name={`note:${k}`} rows={k === 'summary' ? 5 : 3} defaultValue={b.notes?.[k] || ''} placeholder={k === 'summary' ? 'The 3–4 things the players need to know (one per line)' : 'Key points for this part (one per line)'} />
+              <textarea ref={k === 'summary' ? summaryBox : undefined} name={`note:${k}`} rows={k === 'summary' ? 5 : 3} defaultValue={b.notes?.[k] || ''} placeholder={k === 'summary' ? 'The 3–4 things the players need to know (one per line)' : 'Key points for this part (one per line)'} />
+              {k === 'summary' && <Suggestions list={suggestions} box={summaryBox} />}
               {k !== 'summary' && <input name={`link:${k}`} defaultValue={b.links?.[k] || ''} placeholder="Nacsport Hub link for the clips (optional)" />}
             </div>
           ))}

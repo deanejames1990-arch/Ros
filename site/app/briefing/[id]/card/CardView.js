@@ -183,6 +183,7 @@ export default function CardView({ model, admin }) {
         <button type="button" className="primary" onClick={save}>Save image</button>
         <span className="muted small">{busy || '1080 × 1920 · for WhatsApp'}{!model.published ? ' · draft' : ''}</span>
       </div>
+      {model.suggested && model.messages.length > 0 && <p className="card small">These key messages are <b>suggested from the numbers</b> — you haven’t written any yet. {admin ? <a href={`/briefing/${model.id}?edit=1`}>Edit them in the briefing</a> : null}</p>}
       {model.messages.length === 0 && admin && <p className="card small">No key messages yet: add 3–4 in the briefing editor (Key messages box) and they’ll lead the image.</p>}
       <div className="ig-frame" ref={box}>
         <div ref={ref} style={{ width: W * scale, height: H * scale }}>

@@ -10,6 +10,7 @@ import { KickoutSection, ShootingSection, TurnoverSection, PlayerTable, PssTable
 import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
 import { PrintButton, SectionImages } from '../../report/Export';
 import Editor from './Editor';
+import { suggestKeyMessages } from '../../../lib/briefing-suggest';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,7 @@ export default async function Briefing({ params, searchParams }) {
       <p className="muted no-print"><a href="/briefing">Briefings</a> · <a href={`/team/${encodeURIComponent(team.name)}`}>{team.name} full report</a>
         {admin && <> · {searchParams.edit ? <a href={`/briefing/${b.id}`}>Close editor</a> : <a href={`/briefing/${b.id}?edit=1`}>Edit</a>}</>}</p>
       {searchParams.saved && <p className="card check ok small no-print">Saved.</p>}
-      {admin && searchParams.edit && <Editor b={b} candidates={d.candidates} sections={SECTIONS} />}
+      {admin && searchParams.edit && <Editor b={b} candidates={d.candidates} sections={SECTIONS} suggestions={suggestKeyMessages(d, quarterTrend)} />}
       <div className="hero" data-export-title={`${b.title} · ${rows.length} games`}>
         <h1><Crest name={team.name} src={crests.byId[team.id]} size={44} className="brief-crest" />{b.title}{!b.published && <span className="muted"> · draft</span>}</h1>
         <div className="brief-actions no-print"><a className="button primary" href={`/briefing/${b.id}/card`}>Infographic</a><PrintButton /></div>
