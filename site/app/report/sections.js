@@ -15,6 +15,54 @@ export function Pss({ q, t, showPoss = true }) {
   );
 }
 
+// Possessions – shots – scores table: one row per side (team, opposition…).
+// rows: [{ name, href?, color?, s: pssSummary(...), note? }]
+const f1 = (v) => (v == null ? '–' : v.toFixed(1));
+export function PssTable({ rows, t, caption }) {
+  const shown = rows.filter((r) => r.s);
+  if (!shown.length) return null;
+  return (
+    <div className="card">
+      <div className="wrap">
+        <table className="nums pss-table">
+          <thead>
+            <tr>
+              <th />
+              <th>Games</th>
+              <th title="Per game: possessions-shots-scores">Per game</th>
+              <th title={t ? `Average quarter, marked against the target ${targetText(t)}` : 'Average quarter'}>Avg quarter{t ? ` (${targetText(t)})` : ''}</th>
+              <th title="Shots from possessions">Poss → shot</th>
+              <th title="Scores from shots">Shot → score</th>
+              <th title="Scores from possessions">Poss → score</th>
+              <th>Pts a game</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((r) => {
+              const s = r.s, q = s.quarter, g = s.perGame;
+              const h = q && t ? hit({ poss: Math.round(q.poss * 10) / 10, shots: Math.round(q.shots * 10) / 10, scores: Math.round(q.scores * 10) / 10 }, t) : null;
+              const mark = (k) => (h ? (h[k] ? 'pss-ok' : 'pss-miss') : '');
+              return (
+                <tr key={r.name} className={r.strong ? 'strong' : ''}>
+                  <td>{r.color && <i className="sw" style={{ background: r.color }} />}{r.href ? <a href={r.href}>{r.name}</a> : r.name}{r.note && <small className="muted"> {r.note}</small>}</td>
+                  <td>{s.games}</td>
+                  <td>{s.hasPoss ? `${f1(g.poss)}-` : ''}{f1(g.shots)}-{f1(g.scores)}</td>
+                  <td>{q ? <span className={`pss ${h?.all ? 'pss-all' : ''}`}><span className={mark('poss')}>{f1(q.poss)}</span>-<span className={mark('shots')}>{f1(q.shots)}</span>-<span className={mark('scores')}>{f1(q.scores)}</span></span> : '–'}</td>
+                  <td>{s.possToShot == null || !s.hasPoss ? '–' : `${s.possToShot}%`}</td>
+                  <td>{s.shotToScore == null ? '–' : `${s.shotToScore}%`}</td>
+                  <td>{s.possToScore == null || !s.hasPoss ? '–' : `${s.possToScore}%`}</td>
+                  <td>{f1(g.points)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {caption && <p className="muted small">{caption}</p>}
+    </div>
+  );
+}
+
 // Season card: how often the quarter target was hit.
 export function QuarterTargets({ name, quarters, t, games }) {
   const r = hitRates(quarters, t);

@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../../../lib/analysis';
-import { CompareTypes, QuarterTargets } from '../../report/sections';
+import { CompareTypes, QuarterTargets, PssTable } from '../../report/sections';
+import { pssSummary } from '../../../lib/pss';
 import { targetFor } from '../../../lib/targets';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -221,6 +222,15 @@ export default async function TeamReport({ params, searchParams }) {
         <p className="card muted">No tagged games for {teamName} in this selection yet.</p>
       ) : (
         <>
+          <h2>Possessions – shots – scores</h2>
+          <PssTable t={targetFor(grade)} rows={[
+            { name: teamName, strong: true, color: TEAM, s: pssSummary(tagged.map((d) => d.mine)) },
+            { name: tagged.length === 1 ? tagged[0].oppName : 'Opposition', color: OPP, s: pssSummary(tagged.map((d) => d.opp)) },
+            ...(!comp && types.length > 1 ? ['League', 'Championship'].map((ty) => {
+              const ds = tagged.filter((d) => compType(d.m.competitions?.name) === ty);
+              return { name: `${teamName} · ${ty}`, s: pssSummary(ds.map((d) => d.mine)) };
+            }) : []),
+          ]} caption={`Totals over ${tagged.length} tagged game${tagged.length === 1 ? '' : 's'} in this selection; excluded games are left out.`} />
           <KickoutSection A={A} B={B} a={a} b={b} />
           <ShootingSection A={A} B={B} a={a} b={b} />
           {targetFor(grade) && (

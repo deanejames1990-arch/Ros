@@ -7,6 +7,8 @@ import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
 import { targetFor, targetText, hitRates } from '../lib/targets';
+import { pssSummary } from '../lib/pss';
+import { PssTable } from './report/sections';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +63,24 @@ export default async function Home({ searchParams }) {
     return { ...base, us: r.byTeam[usId], them: r.byTeam[oppId] };
   }));
   const tagged = rows.filter((r) => r.us);
+
+  // Every other game this season (opposition scouting), for each team's numbers.
+  const scouted = games.filter((m) => m.competitions?.grade === grade && m.competitions?.seasons?.year === year
+    && !US.test(m.team1.name) && !US.test(m.team2.name));
+  const scoutedSides = (await Promise.all(scouted.map(async (m) => {
+    const raw = await loadEvents(m.id);
+    if (!raw.length) return [];
+    const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
+    const r = analyseMatch({ events: withoutNames(raw), teams });
+    return teams.map((t) => ({ name: t.name, side: r.byTeam[t.id] }));
+  }))).flat();
+  const oppSides = {};
+  for (const r of tagged) (oppSides[r.opp] ||= { v: 0, list: [] }).list.push(r.them), oppSides[r.opp].v += 1;
+  for (const x of scoutedSides) (oppSides[x.name] ||= { v: 0, list: [] }).list.push(x.side);
+  const oppRows = Object.entries(oppSides)
+    .map(([name, o]) => ({ name, s: pssSummary(o.list), v: o.v }))
+    .filter((r) => r.s)
+    .sort((a, b) => b.s.games - a.s.games || a.name.localeCompare(b.name));
   const usAll = combineSides(tagged.map((r) => r.us));
   const themAll = combineSides(tagged.map((r) => r.them));
   const rec = { W: rows.filter((r) => r.res === 'W').length, D: rows.filter((r) => r.res === 'D').length, L: rows.filter((r) => r.res === 'L').length };
@@ -141,6 +161,18 @@ export default async function Home({ searchParams }) {
               <span className="muted small">last {form.length}, oldest first</span>
             </div>
           </div>
+
+          <h2>Possessions – shots – scores</h2>
+          <PssTable t={targetFor(grade)}
+            rows={[
+              { name: 'Roscommon', strong: true, color: ROS, href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)) },
+              { name: 'Opposition v Roscommon', color: OPP, s: pssSummary(tagged.map((r) => r.them)) },
+              ...oppRows.map((r) => ({
+                name: r.name, s: r.s, note: r.v ? `(${r.v} v Ros)` : '',
+                href: `/team/${encodeURIComponent(r.name)}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`,
+              })),
+            ]}
+            caption={`${grade} ${year || ''}: Roscommon's tagged games, then every opposition team from all their tagged games on the site this season (against Roscommon and scouted). Possessions are as tagged, or worked out from the play where a file has none.${targetFor(grade) ? ` Average quarter marked against ${targetText(targetFor(grade))}.` : ''}`} />
 
           <h2>Trends, game by game</h2>
           <div className="trend-grid">

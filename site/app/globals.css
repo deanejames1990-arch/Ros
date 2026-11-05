@@ -531,3 +531,6 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .target-grid small{font-weight:700;color:var(--dk)}
 .trends-q{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;background:#f7f9fc;border-radius:8px;padding:8px 10px}
 .stat-link{text-decoration:none;color:var(--dk)}
+.pss-table td:first-child{text-align:left;white-space:nowrap}
+.pss-table tr.strong td{font-weight:700;background:#f3f5fb}
+.pss-table td{white-space:nowrap}
