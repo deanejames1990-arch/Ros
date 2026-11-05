@@ -94,10 +94,13 @@ const order = (a, b) =>
 export function analyseMatch({ events: given = [], teams, match = null, period = 'All' }) {
   // Files without possession tags: work possessions out from the play
   // (kick-outs, turnovers, frees, shots), the same way as the live tagger.
-  const possCalculated = given.length > 0 && !given.some((e) => e.event_type === 'Poss') && given.some((e) => e.event_type === 'Kickout');
+  // Possessions saved by the live tagger (Auto) are always worked out again, so
+  // a game saved before a rule change shows the current rule straight away.
+  const base = given.filter((e) => !(e.event_type === 'Poss' && e.labels?.Auto));
+  const possCalculated = base.length > 0 && !base.some((e) => e.event_type === 'Poss') && base.some((e) => e.event_type === 'Kickout');
   const raw = possCalculated
-    ? withPossessions([...given].sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || order(a, b)), teams)
-    : given;
+    ? withPossessions([...base].sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || order(a, b)), teams)
+    : base;
   const all = [...raw].sort(order);
   const elapsed = elapsedMinutes(all);
 
@@ -380,7 +383,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   const hasLabel = (k) => all.some((e) => lbl(e, k));
 
   return {
-    period, events, byTeam, flow, endMin, halfTime, elapsed, check, otherTypes: unknownTypes, total: all.length, possCalculated,
+    period, events, byTeam, flow, endMin, halfTime, elapsed, check, otherTypes: unknownTypes, total: all.length, possCalculated, allEvents: all,
     has: { poss: has('Poss'), attack: has('Attack'), turnover: has('Turnover'), foul: has('Foul'), kickout: has('Kickout'),
       area: hasLabel('PitchArea'), turnoverType: hasLabel('TurnoverType'), setup: hasLabel('Setup'), goalChance: hasLabel('GoalChance') },
   };

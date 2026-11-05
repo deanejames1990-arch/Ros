@@ -128,7 +128,7 @@ export default async function Match({ params, searchParams }) {
       {hasEvents && liveNow && (
         <>
           <h2>Trends</h2>
-          <Trends events={events} teams={[A, B]} usId={rosIdx === -1 ? null : teams[rosIdx].id} target={target}
+          <Trends events={r.allEvents} teams={[A, B]} usId={rosIdx === -1 ? null : teams[rosIdx].id} target={target}
             halfLen={Number(String(m.match_code).split('-')[2]) || 35} windowMin={trendMin}
             controls={<span className="seg trend-win no-print">{[5, 10, 15].map((n) => <a key={n} href={`?${new URLSearchParams({ ...(period !== 'All' ? { period } : {}), ...(view === 'analyst' ? { view } : {}), trend: String(n) })}`} className={trendMin === n ? 'on' : ''}>{n} min</a>)}</span>} />
         </>
@@ -193,10 +193,10 @@ export default async function Match({ params, searchParams }) {
           {target && (
             <p className="muted small">
               {[A, B].map((t, k) => `${t.name} hit all three in ${(k ? b : a).pss.filter((q) => hit(q, target).all).length} of 4 quarters`).join('; ')}.
-              {' '}Green = target met, red = short of it.{r.possCalculated ? ' Possessions are worked out from the play (this file has no possession tags).' : ''}
+              {' '}Green = target met, red = short of it.{r.possCalculated ? ' Possessions are worked out from the play.' : ''}
             </p>
           )}
-          {!target && r.possCalculated && <p className="muted small">Possessions are worked out from the play: this file has no possession tags.</p>}
+          {!target && r.possCalculated && <p className="muted small">Possessions are worked out from the play.</p>}
 
           <KickoutSection A={A} B={B} a={a} b={b} />
           {view === 'analyst' && [A, B].some((t) => r.byTeam[t.id].kickoutSetups.some((x) => x.key !== '—')) && (
