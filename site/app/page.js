@@ -103,6 +103,7 @@ export default async function Home({ searchParams }) {
   const tiles = [
     { href: '/games', t: 'Games', d: `${games.length} games: Roscommon and opposition, by season and competition` },
     { href: '/teams', t: 'Teams', d: 'Every county on the site: opposition reports and squads' },
+    { href: '/briefing', t: 'Opposition briefings', d: 'Team lists, scorers, shooting, kick-outs and clips for the next opponent' },
     { href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, t: 'Roscommon report', d: `${grade} ${year || ''}: kick-outs, shooting, turnovers, players` },
     ...(admin || role === 'tagger' ? [
       { href: '/admin/live', t: 'Live tagger', d: 'Tag a game as it happens, with quarter and half-time numbers', admin: true },
