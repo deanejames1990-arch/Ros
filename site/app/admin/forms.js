@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
-import { updateGame, deleteGame, updateCompetition, mergeCompetition } from './actions';
+import { updateGame, deleteGame, updateCompetition, mergeCompetition, renameTeam, mergeTeam } from './actions';
 
 function Submit({ children, danger }) {
   const { pending } = useFormStatus();
@@ -91,6 +91,32 @@ export function CompetitionForm({ c, others, games }) {
           <Result s={m} />
         </details>
       )}
+    </div>
+  );
+}
+
+// One team: rename it, or merge it into another (e.g. "York" into "New York").
+export function TeamForm({ t, others, games, suspect }) {
+  const [rs, rename] = useFormState(renameTeam, null);
+  const [ms, merge] = useFormState(mergeTeam, null);
+  return (
+    <div className={`team-tool ${suspect ? 'suspect' : ''}`}>
+      <div><b>{t.name}</b> <span className="muted small">{games} game{games === 1 ? '' : 's'}</span>
+        {suspect && <span className="badge-off"> looks like {suspect}</span>}</div>
+      <form action={rename} className="inline">
+        <input type="hidden" name="id" value={t.id} />
+        <input name="name" defaultValue={t.name} aria-label={`Rename ${t.name}`} />
+        <button type="submit">Rename</button>
+      </form>
+      <form action={merge} className="inline" onSubmit={(e) => { const into = e.currentTarget.into.selectedOptions[0]?.text; if (!window.confirm(`Move all of ${t.name}’s games into ${into} and remove ${t.name}?`)) e.preventDefault(); }}>
+        <input type="hidden" name="id" value={t.id} />
+        <select name="into" defaultValue={suspect ? others.find((o) => o.name === suspect)?.id : ''} aria-label={`Merge ${t.name} into`}>
+          <option value="">Merge into…</option>
+          {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <button type="submit" className="danger">Merge</button>
+      </form>
+      {(rs?.error || ms?.error) && <p className="check warn small">{rs?.error || ms?.error}</p>}
     </div>
   );
 }

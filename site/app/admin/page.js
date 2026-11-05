@@ -1,7 +1,7 @@
 import { db, MATCH_SELECT } from '../../lib/db';
 import { score } from '../components';
 import { passwords } from '../../lib/auth';
-import { CompetitionForm } from './forms';
+import { CompetitionForm, TeamForm } from './forms';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Manage · James Deane Analysis' };
@@ -16,6 +16,15 @@ export default async function Manage({ searchParams }) {
     .sort((a, b) => (b.year || 0) - (a.year || 0) || (a.grade || '').localeCompare(b.grade || '') || a.name.localeCompare(b.name));
   const n = {};
   for (const r of counts || []) n[r.competition_id] = (n[r.competition_id] || 0) + 1;
+  // Teams, with game counts; flag a name that sits inside another ("York" / "New York").
+  const { data: allTeams } = await db.from('teams').select('id, name').order('name');
+  const gc = {};
+  for (const m of matches || []) { gc[m.team1_id] = (gc[m.team1_id] || 0) + 1; gc[m.team2_id] = (gc[m.team2_id] || 0) + 1; }
+  const teamList = (allTeams || []).map((t) => {
+    const twin = (allTeams || []).find((o) => o.id !== t.id && o.name.length > t.name.length
+      && new RegExp(`(^|\\s)${t.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, 'i').test(o.name));
+    return { ...t, games: gc[t.id] || 0, suspect: twin?.name || null };
+  }).sort((a, b) => (b.suspect ? 1 : 0) - (a.suspect ? 1 : 0) || a.name.localeCompare(b.name));
   const q = String(searchParams.q || '').toLowerCase();
   const list = (matches || []).filter((m) => !q || `${m.team1.name} ${m.team2.name} ${m.competitions?.name} ${m.match_date}`.toLowerCase().includes(q));
 
@@ -52,6 +61,16 @@ export default async function Manage({ searchParams }) {
           </tbody>
         </table>
       </div>
+
+      <h2 id="teams">Teams</h2>
+      {searchParams.teams && <p className="card check ok small">Team {searchParams.teams}.</p>}
+      <p className="muted small">Rename a team, or merge a duplicate into the right one (all its games, tags, team sheets and tidied names move across). Likely duplicates are flagged.</p>
+      <details className="card" open={teamList.some((t) => t.suspect)}>
+        <summary><b>{teamList.length} teams</b>{teamList.some((t) => t.suspect) && <span className="muted small"> · {teamList.filter((t) => t.suspect).length} look like duplicates</span>}</summary>
+        <div className="team-tools">
+          {teamList.map((t) => <TeamForm key={t.id} t={t} games={t.games} suspect={t.suspect} others={teamList.filter((o) => o.id !== t.id)} />)}
+        </div>
+      </details>
 
       <h2>Competitions</h2>
       <p className="muted small">Rename, set the grade, hide player names (underage), or merge a duplicate into another competition.</p>

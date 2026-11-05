@@ -112,3 +112,69 @@ export async function mergeCompetition(_prev, form) {
   revalidatePath('/', 'layout');
   redirect('/admin?merged=1');
 }
+
+// ---- Teams -----------------------------------------------------------------
+// Kick-out results name the winning team ("York Clean"), so a team's games
+// are rewritten with its new name when it's renamed or merged.
+async function renameInOutcomes(matchIds, oldName, newName) {
+  if (!matchIds.length || oldName.toLowerCase() === newName.toLowerCase()) return;
+  const { data } = await db.from('events').select('outcome').in('match_id', matchIds).eq('event_type', 'Kickout').limit(10000);
+  const outs = [...new Set((data || []).map((e) => e.outcome).filter(Boolean))];
+  for (const o of outs) {
+    if (!o.toLowerCase().startsWith(`${oldName.toLowerCase()} `)) continue;
+    await db.from('events').update({ outcome: `${newName}${o.slice(oldName.length)}` }).in('match_id', matchIds).eq('outcome', o);
+  }
+}
+async function gamesOf(id) {
+  const { data } = await db.from('matches').select('id').or(`team1_id.eq.${id},team2_id.eq.${id}`);
+  return (data || []).map((m) => m.id);
+}
+
+export async function renameTeam(_prev, form) {
+  try {
+    await requireAdmin();
+    const id = Number(form.get('id'));
+    const name = clean(form.get('name'));
+    if (!id || !name) throw new Error('Give the team a name.');
+    const { data: t } = await db.from('teams').select('id, name').eq('id', id).single();
+    if (!t) throw new Error('Team not found.');
+    const { data: clash } = await db.from('teams').select('id').ilike('name', name).neq('id', id).limit(1);
+    if (clash?.length) throw new Error(`There’s already a team called ${name}: use Merge instead.`);
+    const { error } = await db.from('teams').update({ name }).eq('id', id);
+    if (error) throw new Error(error.message);
+    await renameInOutcomes(await gamesOf(id), t.name, name);
+  } catch (e) {
+    return { error: String(e.message || e) };
+  }
+  revalidatePath('/', 'layout');
+  redirect('/admin?teams=renamed#teams');
+}
+
+// Moves everything from one team onto another (games, tags, team sheets, tidied
+// names), then removes the first: e.g. "York" into "New York".
+export async function mergeTeam(_prev, form) {
+  try {
+    await requireAdmin();
+    const from = Number(form.get('id'));
+    const into = Number(form.get('into'));
+    if (!into || into === from) throw new Error('Choose a different team to merge into.');
+    const { data: tf } = await db.from('teams').select('id, name').eq('id', from).single();
+    const { data: ti } = await db.from('teams').select('id, name').eq('id', into).single();
+    if (!tf || !ti) throw new Error('Team not found.');
+    const ids = await gamesOf(from);
+    for (const [col] of [['team1_id'], ['team2_id']]) {
+      const { error } = await db.from('matches').update({ [col]: into }).eq(col, from);
+      if (error) throw new Error(friendly(error.message));
+    }
+    await db.from('events').update({ team_id: into }).eq('team_id', from);
+    await db.from('appearances').update({ team_id: into }).eq('team_id', from);
+    await db.from('name_aliases').update({ team_id: into }).eq('team_id', from); // table may not exist yet: ignored
+    await renameInOutcomes(ids, tf.name, ti.name);
+    const { error: de } = await db.from('teams').delete().eq('id', from);
+    if (de) throw new Error(de.message);
+  } catch (e) {
+    return { error: String(e.message || e) };
+  }
+  revalidatePath('/', 'layout');
+  redirect('/admin?teams=merged#teams');
+}

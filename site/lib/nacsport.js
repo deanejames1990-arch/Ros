@@ -109,8 +109,12 @@ export function guessFromName(name = '', videoName = '') {
   const m = base.match(vs);
   let home = '', away = '';
   if (m) {
-    home = m[1].trim().split(/\s+/).pop();
-    away = m[2].trim().split(/\s+/)[0];
+    // Two-word counties ("New York") are matched whole; otherwise the word
+    // either side of the "v".
+    const endsWith = (txt) => COUNTIES.find((c) => new RegExp(`(^|\\s)${c}$`, 'i').test(txt.trim()));
+    const startsWith = (txt) => COUNTIES.find((c) => new RegExp(`^${c}(\\s|$)`, 'i').test(txt.trim()));
+    home = endsWith(m[1]) || m[1].trim().split(/\s+/).pop();
+    away = startsWith(m[2]) || m[2].trim().split(/\s+/)[0];
   }
   let date = '';
   const both = `${videoName} ${base}`.replace(/_/g, ' ');
