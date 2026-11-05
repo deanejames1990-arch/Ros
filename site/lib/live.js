@@ -154,7 +154,10 @@ export function liveScore(events, teamId) {
 //   free won by the team without the ball -> new possession for them
 //   score / wide -> possession over; the next one starts from the kick-out
 //   short, saved, blocked, off the post -> over unless the same team gets it back
-//     (a 45, a mark, a rebound), which stays the same possession
+//     (a 45, a mark, a rebound), which stays the same possession; if the other
+//     team plays it next, that's a possession for them from the shot dropping short
+//   a team losing the ball must have had it: if that possession wasn't picked
+//     up, it's counted before the turnover
 //   start of each half -> throw-in possession for whoever plays the ball first
 // Rows are events-table rows (team_id, event_type, outcome, labels…). Returns the
 // rows with 'Poss' rows added just before the event that started each
@@ -192,15 +195,18 @@ export function withPossessions(rows, teams) {
       started = true; // a kick-out is never the throw-in
       if (w) start(w, w === e.team_id ? 'Own Kickout' : 'Opp Kickout', e);
     } else if (e.event_type === 'Turnover') {
-      start(other(e.team_id), 'Turnover', e); // team_id is the team that lost it
+      // team_id lost it, so they must have had it: if that possession wasn't
+      // picked up (e.g. they gathered a short shot), count it first.
+      if (current !== e.team_id) start(e.team_id, loose && loose !== e.team_id ? 'Opp shot dropped short' : 'Other', e);
+      start(other(e.team_id), 'Turnover', e);
     } else if (e.event_type === 'Foul') {
       const ben = other(e.team_id);
       if (ben === loose) { current = ben; loose = null; } // their shot dropped short, then they won a free: same possession
-      else if (ben !== current) start(ben, 'Free', e);
+      else if (ben !== current) start(ben, loose === e.team_id ? 'Opp shot dropped short' : 'Free', e);
     } else if (isShot(e)) {
       if (current !== e.team_id) {
         if (loose === e.team_id) current = e.team_id; // got it back after a short / save: same possession
-        else start(e.team_id, 'Other', e);
+        else start(e.team_id, loose ? 'Opp shot dropped short' : 'Other', e);
       }
       out.push(e);
       if (ends(e)) { current = null; loose = null; } else { loose = e.team_id; current = null; }
