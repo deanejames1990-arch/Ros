@@ -4,7 +4,7 @@ import { nameEvents, isNumberTag } from '../lib/players';
 import { getAliases } from '../lib/aliases';
 import { isLiveNow } from '../lib/live';
 import { currentAccess, gradeOk } from '../lib/session';
-import { winningTrends } from '../lib/winning';
+import { winningTrends, koRanges } from '../lib/winning';
 import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
@@ -89,7 +89,9 @@ export default async function Home({ searchParams }) {
     o.list.push(x.side); o.pairs.push({ mine: x.side, opp: x.opp });
   }
   // What winning teams do, from every tagged game this season.
-  const win = winningTrends([...tagged.map((r) => ({ a: r.us, b: r.them, pa: r.f, pb: r.a, ros: 'a' })), ...scoutedGames]);
+  const winGames = [...tagged.map((r) => ({ a: r.us, b: r.them, pa: r.f, pb: r.a, ros: 'a' })), ...scoutedGames];
+  const win = winningTrends(winGames);
+  const koR = koRanges(winGames);
   const usTrend = quarterTrend(tagged.map((r) => ({ mine: r.us, opp: r.them })));
   const oppRows = Object.entries(oppSides)
     .map(([name, o]) => ({ name, s: pssSummary(o.list), v: o.v, trend: quarterTrend(o.pairs) }))
@@ -211,6 +213,7 @@ export default async function Home({ searchParams }) {
             caption={`${grade} ${year || ''}: Roscommon's tagged games, then every opposition team from all their tagged games on the site this season (against Roscommon and scouted). Possessions are as tagged, or worked out from the play where a file has none.${targetFor(grade) ? ` Average quarter marked against ${targetText(targetFor(grade))}.` : ''}`} />
 
           {win.rows.length > 0 && <WinningTrends win={win} grade={grade} year={year} />}
+          {(koR.opp || koR.own) && <KickoutRanges r={koR} />}
 
           <h2>Trends, game by game</h2>
           <div className="trend-grid">
@@ -321,6 +324,45 @@ function WinningTrends({ win, grade, year }) {
           </table>
         </div>
         <p className="small muted">“…it won” is how often the team ahead on that stat won (games level on it are left out). Winners / losers are the averages a game. Roscommon’s column is our average this season: ✓ at or better than the winners’ average, ✗ short of it. Small numbers of games swing these a lot.</p>
+      </div>
+    </>
+  );
+}
+
+// Kick-out ranges that go with winning: the other team's kick-outs won, and our own kept.
+function KickoutRanges({ r }) {
+  const Part = ({ title, d, what }) => {
+    if (!d) return null;
+    const band = (b) => (b.hi > 100 ? `${b.lo}%+` : b.lo === 0 ? `under ${b.hi}%` : `${b.lo}–${b.hi - 1}%`);
+    const rosBand = d.ros == null ? null : d.bands.find((b) => d.ros >= b.lo && d.ros < b.hi);
+    return (
+      <div className="ko-range">
+        <h3>{title}</h3>
+        {d.best && (
+          <p className="ko-range-call"><b>{d.best.t}%+</b> {what}: won <b>{d.best.up.won} of {d.best.up.n}</b> ({d.best.up.pct}%). Under {d.best.t}%: won {d.best.down.won} of {d.best.down.n} ({d.best.down.pct}%).</p>
+        )}
+        <table className="ko-range-table">
+          <thead><tr><th>{what}</th><th>Games won</th></tr></thead>
+          <tbody>
+            {d.bands.filter((b) => b.n).map((b) => (
+              <tr key={b.lo} className={rosBand === b ? 'ros' : ''}>
+                <td>{band(b)}{rosBand === b ? <small> · Roscommon avg</small> : ''}</td>
+                <td className="num"><span className="win-bar"><i style={{ width: `${b.pct}%` }} /></span> {b.won} of {b.n} <small className="muted">({b.pct}%)</small></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="small muted">Middle value: winners {d.winners}% · losers {d.losers}%{d.ros != null ? <> · <b>Roscommon {d.ros}%</b> ({d.rosGames} game{d.rosGames === 1 ? '' : 's'})</> : ''}</p>
+      </div>
+    );
+  };
+  return (
+    <>
+      <h2>Kick-outs: the % that wins games</h2>
+      <div className="card ko-ranges">
+        <Part title="The other team’s kick-outs" d={r.opp} what="of their kick-outs won" />
+        <Part title="Our own kick-outs" d={r.own} what="of own kick-outs kept" />
+        <p className="small muted ko-ranges-note">Each team in each decided tagged game counts once ({r.opp?.n || r.own?.n} performances). The headline split is the one that best separates wins from losses. Kick-outs are only one part of a result, and a handful of games moves these a lot.</p>
       </div>
     </>
   );
