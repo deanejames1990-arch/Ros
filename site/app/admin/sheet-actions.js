@@ -6,10 +6,13 @@ import { scoresFromTags } from '../../lib/players';
 
 const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 
-async function insertApps(rows) {
+// Writes a sheet's rows. Upsert on (match, player) so two saves landing at
+// the same moment (two tabs, a save and a finish) can't clash.
+async function upsertApps(rows) {
   if (!rows.length) return { error: null };
-  let res = await db.from('appearances').insert(rows.map((r) => ({ ...r, source: 'live' })));
-  if (res.error && /source|check|enum|invalid input/i.test(res.error.message)) res = await db.from('appearances').insert(rows.map((r) => ({ ...r, source: 'nacsport' })));
+  const put = (source) => db.from('appearances').upsert(rows.map((r) => ({ ...r, source })), { onConflict: 'match_id,player_id' });
+  let res = await put('live');
+  if (res.error && /source|check|enum|invalid input/i.test(res.error.message)) res = await put('nacsport');
   return res;
 }
 
@@ -86,10 +89,26 @@ export async function saveTeamSheet(matchId, teamId, entries) {
       }
       out.push({ ...e, id });
     }
+    // The same player can only be on a game once.
+    const byId = new Map();
+    for (const e of out) {
+      const prev = byId.get(e.id);
+      if (prev) throw new Error(`${e.name} is on the sheet twice (${prev.no ? `#${prev.no}` : 'no number'} and ${e.no ? `#${e.no}` : 'no number'}): clear one of them.`);
+      byId.set(e.id, e);
+    }
 
-    const { error: de } = await db.from('appearances').delete().eq('match_id', mid).eq('team_id', tid);
+    // Drop anyone no longer on this sheet (and these players from the other
+    // side's sheet for this game, if they were put there by mistake), then write.
+    const keep = out.map((e) => e.id);
+    let del = db.from('appearances').delete().eq('match_id', mid).eq('team_id', tid);
+    if (keep.length) del = del.not('player_id', 'in', `(${keep.join(',')})`);
+    const { error: de } = await del;
     if (de) throw new Error(`Clearing the old sheet: ${de.message}`);
-    const { error: ie } = await insertApps(out.map((e) => ({
+    if (keep.length) {
+      const { error: oe } = await db.from('appearances').delete().eq('match_id', mid).neq('team_id', tid).in('player_id', keep);
+      if (oe) throw new Error(`Clearing the old sheet: ${oe.message}`);
+    }
+    const { error: ie } = await upsertApps(out.map((e) => ({
       match_id: mid, team_id: tid, player_id: e.id, jersey_no: e.no, started: e.no ? e.no <= 15 : false, goals: 0, points: 0,
     })));
     if (ie) throw new Error(`Saving the sheet: ${ie.message}`);
