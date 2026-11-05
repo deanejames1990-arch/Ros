@@ -149,7 +149,8 @@ export function liveScore(events, teamId) {
 
 // ---- Possessions, worked out from the play ------------------------------------
 // A possession is the ball in one team's hands until they give it up:
-//   kick-out    -> new possession for whoever wins it (own or opposition kick-out)
+//   kick-out    -> a possession for the kicking team; if the other team wins it,
+//                  a new possession for them (opposition kick-out)
 //   turnover    -> new possession for the team that won the ball
 //   free won by the team without the ball -> new possession for them
 //   score / wide -> possession over; the next one starts from the kick-out
@@ -186,18 +187,34 @@ export function withPossessions(rows, teams) {
     });
     current = teamId; loose = null; started = true;
   };
-  for (const e of rows) {
+  // A turnover tagged at the moment of a team's own shot (shot hits the post,
+  // drops short and is gathered) is the end of that shot: put it after the shot.
+  const list = [...rows];
+  for (let i = 0; i < list.length; i += 1) {
+    const e = list[i];
+    if (e.event_type !== 'Turnover') continue;
+    for (let j = i + 1; j < list.length && (Number(list[j].start_sec) || 0) - (Number(e.start_sec) || 0) <= 3; j += 1) {
+      if (isShot(list[j]) && list[j].team_id === e.team_id && (list[j].half || '') === (e.half || '')) {
+        list.splice(i, 1); list.splice(j, 0, e); i -= 1; break;
+      }
+    }
+  }
+  for (const e of list) {
     if (e.event_type === 'Poss') continue; // worked out here instead
     const h = e.half || e.labels?.Half;
     if (h !== half) { half = h; current = null; loose = null; started = false; }
     if (e.event_type === 'Kickout') {
-      const w = winnerOf(e);
+      // The kick-out is a possession for the kicking team. Winning it keeps
+      // that same possession; losing it starts one for the other team.
       started = true; // a kick-out is never the throw-in
-      if (w) start(w, w === e.team_id ? 'Own Kickout' : 'Opp Kickout', e);
+      start(e.team_id, 'Own Kickout', e);
+      const w = winnerOf(e);
+      if (w && w !== e.team_id) start(w, 'Opp Kickout', e);
     } else if (e.event_type === 'Turnover') {
       // team_id lost it, so they must have had it: if that possession wasn't
       // picked up (e.g. they gathered a short shot), count it first.
-      if (current !== e.team_id) start(e.team_id, loose && loose !== e.team_id ? 'Opp shot dropped short' : 'Other', e);
+      // (Not after their own short shot: that ball was already loose.)
+      if (current !== e.team_id && loose !== e.team_id) start(e.team_id, loose ? 'Opp shot dropped short' : 'Other', e);
       start(other(e.team_id), 'Turnover', e);
     } else if (e.event_type === 'Foul') {
       const ben = other(e.team_id);
