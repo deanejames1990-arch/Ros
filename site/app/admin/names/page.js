@@ -9,6 +9,34 @@ export const metadata = { title: 'Tidy names · James Deane Analysis' };
 
 const strip = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z' ]/g, '').trim();
 const surname = (s) => strip(s).split(' ').filter(Boolean).slice(-1)[0] || '';
+// For spotting misspellings: no fadas, Mac = Mc, O' = O, letters only.
+const key = (s) => strip(s).replace(/\bmac/g, 'mc').replace(/\bo'\s?/g, 'o').replace(/[^a-z]/g, '');
+function edits(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j += 1) d[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+// Same player, spelt differently? Surnames within 1 letter (2 for long names),
+// and first names / initials that don't clash.
+function looksSame(a, b) {
+  // Surname with its particle (O, Mac, Mc, Ni, Ui, de): "O Connor" = "OConnor".
+  const fullSur = (n) => { const t = strip(n).split(' ').filter(Boolean); const k = t.length > 1 && /^(o|mac|mc|ni|ui|nic|de|di)$/.test(t[t.length - 2]) ? t.slice(-2).join('') : t[t.length - 1] || ''; return key(k); };
+  const sa = fullSur(a), sb = fullSur(b);
+  if (!sa || !sb || sa.length < 4) return false;
+  if (sa[0] !== sb[0]) return false; // misspellings rarely change the first letter (Doyle / Boyle)
+  const limit = Math.max(sa.length, sb.length) >= 8 ? 2 : 1;
+  if (sa !== sb && edits(sa, sb) > limit) return false;
+  const fa = strip(a).split(' ').slice(0, -1).join(' '), fb = strip(b).split(' ').slice(0, -1).join(' ');
+  if (fa && fb && fa[0] !== fb[0]) return false; // different first names
+  return key(a) !== key(b) || a !== b;
+}
 
 export default async function TidyNames({ searchParams }) {
   const { error: tableErr } = await db.from('name_aliases').select('id').limit(1);
@@ -16,7 +44,7 @@ export default async function TidyNames({ searchParams }) {
   const { data: teams } = await db.from('teams').select('id, name').order('name');
   const team = (teams || []).find((t) => t.name.toLowerCase() === String(searchParams.team || '').toLowerCase());
 
-  let rows = [], squad = [], byNumber = [];
+  let rows = [], squad = [], byNumber = [], dupes = [];
   if (team && !missing) {
     const [{ data: games }, { data: apps }, aliases] = await Promise.all([
       db.from('matches').select('id, match_date, team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
@@ -49,15 +77,33 @@ export default async function TidyNames({ searchParams }) {
       if (nums.length) byNumber.push({ id: m.id, date: m.match_date, opp, nums: nums.sort((a, b) => b.tags - a.tags) });
     }));
     byNumber.sort((a, b) => b.date.localeCompare(a.date));
+    // Likely the same player spelt two ways, among names not tidied yet.
+    const untidied = [...seen.values()].filter((r) => !mine.some((a) => a.alias.toLowerCase() === r.name.toLowerCase()));
+    const used = new Set();
+    for (let i = 0; i < untidied.length; i += 1) {
+      if (used.has(i)) continue;
+      const group = [untidied[i]];
+      for (let j = i + 1; j < untidied.length; j += 1) {
+        if (!used.has(j) && looksSame(untidied[i].name, untidied[j].name)) { group.push(untidied[j]); used.add(j); }
+      }
+      if (group.length > 1) {
+        // Keep the fullest name, then the most used.
+        // A real first name beats an initial ("Cian McKeon" over "C. McKeon"), then the longer name, then the more used.
+        const initial = (n) => /^[A-Za-z]\.?$/.test(n.trim().split(/\s+/)[0]) || n.trim().split(/\s+/).length < 2;
+        const target = [...group].sort((a, b) => (initial(a.name) ? 1 : 0) - (initial(b.name) ? 1 : 0) || b.name.length - a.name.length || b.actions - a.actions)[0];
+        dupes.push({ names: group.map((g) => ({ name: g.name, games: g.games, actions: g.actions })), target: target.name });
+      }
+    }
     const squadMap = new Map();
     for (const a of apps || []) if (a.players?.name) squadMap.set(a.players.name.toLowerCase(), a.players.name);
     squad = [...new Set([...squadMap.values(), ...mine.map((a) => a.name)])].sort();
     rows = [...seen.values()].map((r) => {
       const al = mine.find((a) => a.alias.toLowerCase() === r.name.toLowerCase());
-      // Suggest a squad player, or a longer tag name, with the same surname.
-      const sur = surname(r.name);
-      const sugg = [...squad, ...[...seen.values()].map((x) => x.name)]
-        .filter((n) => n.toLowerCase() !== r.name.toLowerCase() && surname(n) === sur && n.split(' ').length > r.name.split(' ').length);
+      // Suggest a squad player, or another tag name, that's the same surname
+      // or a near spelling of it (fuller names first).
+      const others = [...squad, ...[...seen.values()].map((x) => x.name)].filter((n) => n.toLowerCase() !== r.name.toLowerCase());
+      const sugg = others.filter((n) => looksSame(r.name, n) && (n.split(' ').length > r.name.split(' ').length || key(surname(n)) !== key(surname(r.name))))
+        .sort((a, b) => b.split(' ').length - a.split(' ').length);
       return { ...r, alias: al?.name || '', suggest: [...new Set(sugg)].slice(0, 3) };
     }).map((r) => ({ ...r, short: r.name.trim().split(/\s+/).length < 2 || /^[A-Z]\.?\s/.test(r.name) }))
       // Surname-only or initial names first (those are the ones to tidy), then by use.
@@ -89,7 +135,7 @@ export default async function TidyNames({ searchParams }) {
           </form>
           {team && (
             rows.length
-              ? <NameRows teamId={team.id} teamName={team.name} rows={rows} squad={squad} />
+              ? <NameRows teamId={team.id} teamName={team.name} rows={rows} squad={squad} dupes={dupes} />
               : <p className="card muted">No names in {team.name}’s tags yet.</p>
           )}
           {team && byNumber.length > 0 && (

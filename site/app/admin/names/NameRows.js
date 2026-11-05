@@ -33,10 +33,42 @@ function Row({ teamId, r, listId }) {
   );
 }
 
-export default function NameRows({ teamId, teamName, rows, squad }) {
+// Spellings that look like the same player: merge them in one click.
+function Dupes({ teamId, dupes }) {
+  const [msg, setMsg] = useState('');
+  if (!dupes.length) return null;
+  const merge = async (d, target) => {
+    setMsg('Merging…');
+    for (const n of d.names) if (n.name !== target) {
+      const r = await setAlias(teamId, n.name, target);
+      if (!r.ok) { setMsg(r.error); return; }
+    }
+    window.location.reload();
+  };
+  return (
+    <div className="card dupes">
+      <p className="small"><b>Possible misspellings</b>: these look like the same player spelt differently. Merge keeps the name you pick and folds the others into it (you can undo with Clear).</p>
+      {dupes.map((d) => (
+        <div key={d.names.map((n) => n.name).join('|')} className="dupe-row">
+          <span>{d.names.map((n) => <span key={n.name} className="num-chip">{n.name}<small> {n.games} game{n.games === 1 ? '' : 's'}</small></span>)}</span>
+          <span className="dupe-btns">
+            {d.names.map((n) => (
+              <button key={n.name} type="button" className={n.name === d.target ? 'primary' : ''} onClick={() => merge(d, n.name)}>Merge as {n.name}</button>
+            ))}
+          </span>
+        </div>
+      ))}
+      {msg && <p className="small">{msg}</p>}
+    </div>
+  );
+}
+
+export default function NameRows({ teamId, teamName, rows, squad, dupes = [] }) {
   const listId = `names-${teamId}`;
   const left = rows.filter((r) => !r.alias && r.short).length;
   return (
+    <>
+    <Dupes teamId={teamId} dupes={dupes} />
     <div className="card">
       <p className="small"><b>{rows.length}</b> names in {teamName}’s tags · <b>{left}</b> look like a surname or initial only and need a full name. Those come first, then the rest by how often they’re used.</p>
       <datalist id={listId}>{squad.map((n) => <option key={n} value={n} />)}</datalist>
@@ -48,5 +80,6 @@ export default function NameRows({ teamId, teamName, rows, squad }) {
       </div>
       <p className="muted small">Leave a name blank if it’s already right. Changes show on every dashboard, report and profile straight away.</p>
     </div>
+    </>
   );
 }
