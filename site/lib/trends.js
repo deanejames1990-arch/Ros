@@ -1,6 +1,6 @@
 // In-game trends: what has happened in the most recent spell of play, written
 // as short call-outs a coach can act on. Pure function over events-table rows.
-import { isShot, shotValue, zoneOf } from './analysis';
+import { isShot, shotValue, zoneOf, quarterOf } from './analysis';
 
 const lbl = (e, k) => e.labels?.[k];
 const second = (e) => String(e.half || lbl(e, 'Half') || '').startsWith('2');
@@ -197,6 +197,18 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
     }
   }
 
+  // The quarter in play so far, per team: possessions, shots, scores.
+  const lastE = all[all.length - 1];
+  const qNow = lastE ? quarterOf(lastE) : null;
+  const quarterNow = qNow ? {
+    q: qNow,
+    teams: teams.map((t) => {
+      const inQ = all.filter((e) => e.team_id === t.id && quarterOf(e) === qNow);
+      const shots = inQ.filter(isShot);
+      return { id: t.id, poss: inQ.filter((e) => e.event_type === 'Poss').length, shots: shots.length, scores: shots.filter((e) => shotValue(e) > 0).length };
+    }),
+  } : null;
+
   items.sort((a, b) => b.weight - a.weight);
   return {
     now, nowLabel: clock(now), windowMin,
@@ -204,5 +216,6 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
     items: items.map((i) => ({ ...i, tone: tone(i.team, i.good), color: i.team })),
     blocks,
     danger,
+    quarterNow,
   };
 }

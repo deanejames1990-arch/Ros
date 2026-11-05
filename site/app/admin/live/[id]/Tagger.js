@@ -9,6 +9,7 @@ import LiveReport from './LiveReport';
 import SheetEditor from '../../SheetEditor';
 import { nameEvents } from '../../../../lib/players';
 import Trends from '../../../report/Trends';
+import { targetFor } from '../../../../lib/targets';
 
 const COLORS = ['#3b4f9e', '#c4572a'];
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -348,7 +349,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
       )}
 
       {view === 'trends' && (
-        <Trends events={rows} teams={teams.map((t, i) => ({ ...t, color: COLORS[i] }))} halfLen={match.halfLen} windowMin={trendMin} usId={teams[0].id}
+        <Trends events={rows} teams={teams.map((t, i) => ({ ...t, color: COLORS[i] }))} halfLen={match.halfLen} windowMin={trendMin} usId={teams[0].id} target={targetFor(match.grade)}
           controls={<span className="seg trend-win">{[5, 10, 15].map((n) => <button key={n} type="button" className={trendMin === n ? 'on' : ''} onClick={() => setTrendMin(n)}>{n} min</button>)}</span>} />
       )}
       {view === 'trends' && events.length === 0 && <p className="muted">Trends appear once you start tagging.</p>}

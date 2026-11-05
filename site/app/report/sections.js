@@ -2,6 +2,39 @@
 // (several games added together). Each side is a byTeam entry from
 // analyseMatch, or the result of combineSides.
 import { Versus } from '../match/[id]/charts';
+import { hit, hitRates, targetText } from '../../lib/targets';
+
+// "12-8-6" with each part marked against the quarter target (when there is one).
+export function Pss({ q, t, showPoss = true }) {
+  const h = hit(q, t);
+  const part = (k) => <span className={h ? (h[k] ? 'pss-ok' : 'pss-miss') : ''}>{q[k]}</span>;
+  return (
+    <span className={`pss ${h?.all ? 'pss-all' : ''}`} title={t ? `Target ${targetText(t)}${h?.all ? ': met' : ''}` : undefined}>
+      {showPoss && <>{part('poss')}-</>}{part('shots')}-{part('scores')}
+    </span>
+  );
+}
+
+// Season card: how often the quarter target was hit.
+export function QuarterTargets({ name, quarters, t, games }) {
+  const r = hitRates(quarters, t);
+  if (!r) return null;
+  const pc = (n) => Math.round((100 * n) / r.n);
+  return (
+    <>
+      <h2>Quarter targets <span className="muted">· {targetText(t)}</span></h2>
+      <div className="card">
+        <div className="target-grid">
+          <div><b className="num">{r.all}/{r.n}</b><span>quarters hit all three</span><small>{pc(r.all)}%</small></div>
+          <div><b className="num">{r.poss}/{r.n}</b><span>{t.poss}+ possessions</span><small>{pc(r.poss)}%</small></div>
+          <div><b className="num">{r.shots}/{r.n}</b><span>{t.shots}+ shots</span><small>{pc(r.shots)}%</small></div>
+          <div><b className="num">{r.scores}/{r.n}</b><span>{t.scores}+ scores</span><small>{pc(r.scores)}%</small></div>
+        </div>
+        <p className="muted small">{name}, {r.n} quarters from {games} tagged game{games === 1 ? '' : 's'}. Target: {t.poss} possessions, {t.shots} shots, {t.scores} scores a quarter.</p>
+      </div>
+    </>
+  );
+}
 
 const pct = (v) => (v == null ? '—' : `${v}%`);
 const rate = (a, b) => (b ? Math.round((100 * a) / b) : null);

@@ -1,8 +1,10 @@
 // In-game trends panel: recent-spell numbers, call-outs and a momentum strip.
 // Plain markup, used on the live match page and in the tagger.
 import { trends } from '../../lib/trends';
+import { Pss } from './sections';
+import { targetText } from '../../lib/targets';
 
-export default function Trends({ events, teams, halfLen = 35, windowMin = 10, usId = null, controls = null }) {
+export default function Trends({ events, teams, halfLen = 35, windowMin = 10, usId = null, controls = null, target = null }) {
   const t = trends({ events, teams, halfLen, windowMin, usId });
   if (!events.length) return null;
   const color = (id) => teams.find((x) => x.id === id)?.color;
@@ -14,6 +16,14 @@ export default function Trends({ events, teams, halfLen = 35, windowMin = 10, us
         <span className="muted small">to {t.nowLabel}</span>
         {controls}
       </div>
+      {t.quarterNow && (
+        <div className="trends-q">
+          <span className="stat-k">{t.quarterNow.q} so far{target ? ` · target ${targetText(target)}` : ''}</span>
+          {t.quarterNow.teams.map((q) => (
+            <span key={q.id}><i className="sw" style={{ background: color(q.id) }} />{teams.find((x) => x.id === q.id)?.name} <b className="num"><Pss q={q} t={q.id === usId || usId == null ? target : null} /></b></span>
+          ))}
+        </div>
+      )}
       <div className="trends-window">
         {t.window.map((w) => (
           <div key={w.id} style={{ '--tc': color(w.id) }}>

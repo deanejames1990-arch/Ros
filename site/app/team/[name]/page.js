@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../../../lib/analysis';
-import { CompareTypes } from '../../report/sections';
+import { CompareTypes, QuarterTargets } from '../../report/sections';
+import { targetFor } from '../../../lib/targets';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
@@ -222,6 +223,10 @@ export default async function TeamReport({ params, searchParams }) {
         <>
           <KickoutSection A={A} B={B} a={a} b={b} />
           <ShootingSection A={A} B={B} a={a} b={b} />
+          {targetFor(grade) && (
+            <QuarterTargets name={teamName} t={targetFor(grade)} games={tagged.filter((d) => d.mine.possessions > 0).length}
+              quarters={tagged.filter((d) => d.mine.possessions > 0).flatMap((d) => d.mine.pss)} />
+          )}
           <PeriodSection A={A} B={B} a={a} b={b} />
           <TurnoverSection A={A} B={B} a={a} />
           <h2>{teamName} players</h2>

@@ -6,6 +6,7 @@ import { currentAccess, gradeOk } from '../lib/session';
 import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
+import { targetFor, targetText, hitRates } from '../lib/targets';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,18 @@ export default async function Home({ searchParams }) {
             {tagged.length > 0 && <div className="card stat"><span className="stat-k">Shot conversion</span><b className="num">{usAll.conv ?? '–'}% <small>v</small> {themAll.conv ?? '–'}%</b><span className="muted small">us v opposition, {tagged.length} tagged game{tagged.length === 1 ? '' : 's'}</span></div>}
             {tagged.length > 0 && usAll.kickouts.retPct != null && <div className="card stat"><span className="stat-k">Own kick-outs won</span><b className="num">{usAll.kickouts.retPct ?? '–'}% <small>v</small> {themAll.kickouts.retPct ?? '–'}%</b><span className="muted small">ours v theirs</span></div>}
             {tagged.length > 0 && (usAll.turnoversWon + usAll.turnoversLost) > 0 && <div className="card stat"><span className="stat-k">Turnovers a game</span><b className="num">{(usAll.turnoversWon / tagged.length).toFixed(1)} <small>v</small> {(usAll.turnoversLost / tagged.length).toFixed(1)}</b><span className="muted small">won v lost, where tagged</span></div>}
+            {(() => {
+              const t = targetFor(grade);
+              const qs = tagged.filter((r) => r.us.possessions > 0).flatMap((r) => r.us.pss);
+              const h = hitRates(qs, t);
+              return h ? (
+                <a href={`/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`} className="card stat stat-link">
+                  <span className="stat-k">Quarters at {targetText(t)}</span>
+                  <b className="num">{h.all} <small>of</small> {h.n}</b>
+                  <span className="muted small">poss {h.poss} · shots {h.shots} · scores {h.scores} of {h.n} met</span>
+                </a>
+              ) : null;
+            })()}
             <div className="card stat"><span className="stat-k">Form</span>
               <span className="form-row">{form.map((r) => <a key={r.m.id} href={`/match/${r.m.id}`} className={`badge ${r.res}`} title={`v ${r.opp} ${r.line} (${r.date})`}>{r.res}</a>)}</span>
               <span className="muted small">last {form.length}, oldest first</span>

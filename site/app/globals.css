@@ -521,3 +521,13 @@ input.sheet-no{font:inherit;font-weight:800;padding:6px 2px;border:1px solid #cf
 /* Calibri everywhere, including form controls and charts */
 button,input,select,textarea,svg text{font-family:var(--font)}
 .lt-poss{display:block;font-size:.75rem;font-weight:600;color:var(--mut)}
+.pss-ok{color:#1d6b33;font-weight:700}
+.pss-miss{color:#9b2c2c}
+.pss-all{background:#e3f1e5;border-radius:6px;padding:1px 5px}
+.target-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.target-grid>div{display:flex;flex-direction:column;background:#f7f9fc;border-radius:10px;padding:10px}
+.target-grid b{font-size:1.4rem}
+.target-grid span{font-size:.8rem;color:var(--mut)}
+.target-grid small{font-weight:700;color:var(--dk)}
+.trends-q{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;background:#f7f9fc;border-radius:8px;padding:8px 10px}
+.stat-link{text-decoration:none;color:var(--dk)}

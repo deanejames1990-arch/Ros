@@ -23,7 +23,7 @@ export default async function LiveGame({ params }) {
   return (
     <Tagger
       match={{ id: m.id, title: `${m.team1.name} v ${m.team2.name}`, competition: m.competitions?.name || '', date: m.match_date, halfLen,
-        hideNames: m.competitions?.show_player_names === false, finished: isFinishedCode(m.match_code),
+        hideNames: m.competitions?.show_player_names === false, finished: isFinishedCode(m.match_code), grade: m.competitions?.grade || '',
         official: { [m.team1_id]: { g: m.team1_goals, p: m.team1_points }, [m.team2_id]: { g: m.team2_goals, p: m.team2_points } } }}
       teams={teams}
       saved={events}

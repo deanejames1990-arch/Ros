@@ -10,6 +10,8 @@ import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
 import { nameEvents } from '../../../lib/players';
+import { targetFor, targetText, hit } from '../../../lib/targets';
+import { Pss } from '../../report/sections';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 
 export const dynamic = 'force-dynamic';
@@ -69,7 +71,8 @@ export default async function Match({ params, searchParams }) {
     return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;
   };
   const teamHref = (name) => `/team/${encodeURIComponent(name)}?${new URLSearchParams({ grade: m.competitions.grade || 'Senior', year: String(m.competitions.seasons.year) })}`;
-  const pss = (q) => (r.has.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots}-${q.scores}`);
+  const target = r.has.poss ? targetFor(m.competitions?.grade) : null;
+  const pss = (q, t = target) => <Pss q={q} t={t} showPoss={r.has.poss} />;
 
   // A game started in the live tagger on or about today: keep the page updating.
   const trendMin = [5, 10, 15].includes(Number(searchParams.trend)) ? Number(searchParams.trend) : 10;
@@ -125,7 +128,7 @@ export default async function Match({ params, searchParams }) {
       {hasEvents && liveNow && (
         <>
           <h2>Trends</h2>
-          <Trends events={events} teams={[A, B]} usId={rosIdx === -1 ? null : teams[rosIdx].id}
+          <Trends events={events} teams={[A, B]} usId={rosIdx === -1 ? null : teams[rosIdx].id} target={target}
             halfLen={Number(String(m.match_code).split('-')[2]) || 35} windowMin={trendMin}
             controls={<span className="seg trend-win no-print">{[5, 10, 15].map((n) => <a key={n} href={`?${new URLSearchParams({ ...(period !== 'All' ? { period } : {}), ...(view === 'analyst' ? { view } : {}), trend: String(n) })}`} className={trendMin === n ? 'on' : ''}>{n} min</a>)}</span>} />
         </>
@@ -165,7 +168,7 @@ export default async function Match({ params, searchParams }) {
             </>
           )}
 
-          <h2>{r.has.poss ? 'Possessions – shots – scores' : 'Shots – scores'}</h2>
+          <h2>{r.has.poss ? 'Possessions – shots – scores' : 'Shots – scores'}{target && <span className="muted"> · target {targetText(target)} a quarter</span>}</h2>
           <div className="wrap">
             <table className="nums">
               <thead>
@@ -181,12 +184,19 @@ export default async function Match({ params, searchParams }) {
                 ))}
                 <tr className="total">
                   <td>Total</td>
-                  <td>{pss({ poss: a.possessions, shots: a.shots, scores: a.scores })}</td><td>{a.total}</td>
-                  <td>{pss({ poss: b.possessions, shots: b.shots, scores: b.scores })}</td><td>{b.total}</td>
+                  <td>{pss({ poss: a.possessions, shots: a.shots, scores: a.scores }, null)}</td><td>{a.total}</td>
+                  <td>{pss({ poss: b.possessions, shots: b.shots, scores: b.scores }, null)}</td><td>{b.total}</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          {target && (
+            <p className="muted small">
+              {[A, B].map((t, k) => `${t.name} hit all three in ${(k ? b : a).pss.filter((q) => hit(q, target).all).length} of 4 quarters`).join('; ')}.
+              {' '}Green = target met, red = short of it.{r.possCalculated ? ' Possessions are worked out from the play (this file has no possession tags).' : ''}
+            </p>
+          )}
+          {!target && r.possCalculated && <p className="muted small">Possessions are worked out from the play: this file has no possession tags.</p>}
 
           <KickoutSection A={A} B={B} a={a} b={b} />
           {view === 'analyst' && [A, B].some((t) => r.byTeam[t.id].kickoutSetups.some((x) => x.key !== '—')) && (

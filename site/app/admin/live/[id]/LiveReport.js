@@ -5,6 +5,8 @@ import { analyseMatch, QUARTERS } from '../../../../lib/analysis';
 import { Versus } from '../../../match/[id]/charts';
 import { ZoneGrid } from '../../../report/sections';
 import { ShotMap, ShotLegend } from '../../../report/ShotMap';
+import { Pss } from '../../../report/sections';
+import { targetFor, targetText, hit } from '../../../../lib/targets';
 
 const pct = (v) => (v == null ? '—' : `${v}%`);
 const sc = (s) => `${s.goals}-${String(s.points).padStart(2, '0')}`;
@@ -141,7 +143,7 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
         </div>
 
         <div className="card">
-          <div className="vs-heading">Quarter by quarter (possessions · shots · scores · points)</div>
+          <div className="vs-heading">Quarter by quarter (possessions-shots-scores · points){targetFor(match.grade) ? ` · target ${targetText(targetFor(match.grade))}` : ''}</div>
           <table className="live-quarters">
             <thead><tr><th /><th>{A.name}</th><th>{B.name}</th></tr></thead>
             <tbody>
@@ -151,8 +153,8 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
                 return (
                   <tr key={q}>
                     <th>{q}</th>
-                    <td className="num">{x.poss} · {x.shots} · {x.scores} · <b>{x.points}</b><small> KO {kx.koWon}/{kx.koTotal}</small></td>
-                    <td className="num">{y.poss} · {y.shots} · {y.scores} · <b>{y.points}</b><small> KO {ky.koWon}/{ky.koTotal}</small></td>
+                    <td className="num"><Pss q={x} t={targetFor(match.grade)} /> · <b>{x.points}</b><small> KO {kx.koWon}/{kx.koTotal}</small></td>
+                    <td className="num"><Pss q={y} t={null} /> · <b>{y.points}</b><small> KO {ky.koWon}/{ky.koTotal}</small></td>
                   </tr>
                 );
               })}
