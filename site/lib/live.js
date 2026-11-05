@@ -117,7 +117,7 @@ export function fromRow(r, teams) {
   const ev = { lid: l.Live || `r${r.id}`, team: r.team_id, half, sec, quarter: l.Quarter || quarterFor(half, sec / 60, 35) };
   const third = (a) => (/attack/i.test(a || '') ? 'Att' : /mid/i.test(a || '') ? 'Mid' : /own/i.test(a || '') ? 'Def' : null);
   switch (r.event_type) {
-    case 'Poss': return { ...ev, kind: 'poss', from: l.PossFrom || null };
+    case 'Poss': return l.Auto ? null : { ...ev, kind: 'poss', from: l.PossFrom || null };
     case 'Kickout': {
       const winnerIsKicker = String(r.outcome || '').toLowerCase().startsWith(String(teams.find((t) => t.id === r.team_id)?.name || '?').toLowerCase());
       const box = l.Zone ? Number(String(l.Zone).replace(/\D/g, '')) : null;
@@ -145,4 +145,68 @@ export function liveScore(events, teamId) {
     else if (e.outcome === 'Point') p += 1;
   }
   return { g, p };
+}
+
+// ---- Possessions, worked out from the play ------------------------------------
+// A possession is the ball in one team's hands until they give it up:
+//   kick-out    -> new possession for whoever wins it (own or opposition kick-out)
+//   turnover    -> new possession for the team that won the ball
+//   free won by the team without the ball -> new possession for them
+//   score / wide -> possession over; the next one starts from the kick-out
+//   short, saved, blocked, off the post -> over unless the same team gets it back
+//     (a 45, a mark, a rebound), which stays the same possession
+//   start of each half -> throw-in possession for whoever plays the ball first
+// Rows are events-table rows (team_id, event_type, outcome, labels…). Returns the
+// rows with 'Poss' rows added just before the event that started each
+// possession; any possessions already in the list are replaced.
+export function withPossessions(rows, teams) {
+  const other = (id) => teams.find((t) => t.id !== id)?.id;
+  const winnerOf = (e) => {
+    const o = String(e.outcome || '').toLowerCase();
+    const w = teams.filter((t) => o.startsWith(t.name.toLowerCase())).sort((a, b) => b.name.length - a.name.length)[0];
+    return w ? w.id : null;
+  };
+  const isShot = (e) => /^shot/i.test(e.event_type || '');
+  const ends = (e) => /goal|point|wide/i.test(e.outcome || ''); // scores and wides go to a kick-out
+  const out = [];
+  let current = null; // team in possession
+  let loose = null;   // team whose shot was short / saved: theirs again if they get it back
+  let half = null;
+  let started = false; // any possession yet this half (the first one is the throw-in)
+  const start = (teamId, from, e) => {
+    if (!teamId) return;
+    out.push({
+      ...(e.match_id ? { match_id: e.match_id } : {}),
+      ...(e.id != null ? { id: `${e.id}p` } : {}),
+      team_id: teamId, event_type: 'Poss', outcome: null, minute: e.minute, half: e.half, start_sec: e.start_sec,
+      player_no: null, code: 'Live', labels: { Half: e.labels?.Half || e.half, Quarter: e.labels?.Quarter, PossFrom: started ? from : 'Throw Up', Auto: true },
+    });
+    current = teamId; loose = null; started = true;
+  };
+  for (const e of rows) {
+    if (e.event_type === 'Poss') continue; // worked out here instead
+    const h = e.half || e.labels?.Half;
+    if (h !== half) { half = h; current = null; loose = null; started = false; }
+    if (e.event_type === 'Kickout') {
+      const w = winnerOf(e);
+      started = true; // a kick-out is never the throw-in
+      if (w) start(w, w === e.team_id ? 'Own Kickout' : 'Opp Kickout', e);
+    } else if (e.event_type === 'Turnover') {
+      start(other(e.team_id), 'Turnover', e); // team_id is the team that lost it
+    } else if (e.event_type === 'Foul') {
+      const ben = other(e.team_id);
+      if (ben === loose) { current = ben; loose = null; } // their shot dropped short, then they won a free: same possession
+      else if (ben !== current) start(ben, 'Free', e);
+    } else if (isShot(e)) {
+      if (current !== e.team_id) {
+        if (loose === e.team_id) current = e.team_id; // got it back after a short / save: same possession
+        else start(e.team_id, 'Other', e);
+      }
+      out.push(e);
+      if (ends(e)) { current = null; loose = null; } else { loose = e.team_id; current = null; }
+      continue;
+    }
+    out.push(e);
+  }
+  return out;
 }

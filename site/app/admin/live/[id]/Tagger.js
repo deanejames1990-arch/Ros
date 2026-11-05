@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { saveLiveGame } from '../actions';
-import { toRow, fromRow, quarterFor, parseSheet, outsideArc, liveScore } from '../../../../lib/live';
+import { toRow, fromRow, quarterFor, parseSheet, outsideArc, liveScore, withPossessions } from '../../../../lib/live';
 import { GRID } from '../../../report/sections';
 import { PitchLines, VIEW } from '../../../report/ShotMap';
 import LiveReport from './LiveReport';
@@ -117,8 +117,8 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   // Load: this device's copy if it has one, otherwise what's on the site.
   useEffect(() => {
     const local = store.get(key);
-    if (local && (local.dirty || (local.events?.length || 0) >= saved.length)) {
-      setEvents(local.events || []);
+    if (local && (local.dirty || (local.events?.filter((e) => e.kind !== 'poss').length || 0) >= saved.filter((r) => !r.labels?.Auto).length)) {
+      setEvents((local.events || []).filter((e) => e.kind !== 'poss'));
       setClock(local.clock || clock);
       // The site's sheet wins unless this device has one the site doesn't.
       setSheets(Object.fromEntries(teams.map((t) => {
@@ -281,8 +281,12 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   const sheetOf = (teamId) => Object.fromEntries((sheets[teamId] || []).filter((e) => e.no).map((e) => [e.no, e.name]));
   const rows = useMemo(() => {
     const apps = teams.flatMap((t) => (sheets[t.id] || []).map((e) => ({ team_id: t.id, jersey_no: e.no, players: { name: e.name } })));
-    return nameEvents(events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), apps, teams);
+    const named = nameEvents(events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), apps, teams);
+    // In time order, then possessions worked out from kick-outs, turnovers, frees and shots.
+    const ordered = [...named].sort((a, b) => (a.start_sec || 0) - (b.start_sec || 0));
+    return withPossessions(ordered, teams);
   }, [events, teams, sheets]);
+  const possCount = (teamId) => rows.filter((r) => r.event_type === 'Poss' && r.team_id === teamId).length;
   const scores = teams.map((t) => liveScore(events, t.id));
   const counts = (kind, team) => events.filter((e) => e.kind === kind && e.team === team).length;
   const reportStart = clock.half === 1 && !clock.running ? '1st Half' : 'All';
@@ -329,8 +333,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         <div className="lt-grid">
           {teams.map((t, i) => (
             <div key={t.id} className="lt-col" style={{ '--tc': COLORS[i] }}>
-              <div className="lt-colhead">{t.name}</div>
-              <button type="button" className="lt-big" onClick={() => start('poss', t.id)}>Possession<small>{counts('poss', t.id)}</small></button>
+              <div className="lt-colhead">{t.name}<small className="lt-poss" title="Worked out from kick-outs, turnovers, frees and shots">{possCount(t.id)} possessions</small></div>
               <button type="button" className="lt-big" onClick={() => start('shot', t.id)}>Shot<small>{counts('shot', t.id)}</small></button>
               <button type="button" className="lt-big" onClick={() => start('ko', t.id)}>Kick-out<small>{counts('ko', t.id)}</small></button>
               <div className="lt-small">

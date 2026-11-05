@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { db } from '../../../lib/db';
 import { requireTagger } from '../../../lib/session';
 import { syncAppearanceScores } from '../sheet-actions';
-import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow } from '../../../lib/live';
+import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow, withPossessions } from '../../../lib/live';
 
 const clean = (s) => String(s || '').trim();
 
@@ -105,7 +105,11 @@ export async function saveLiveGame(matchId, events, opts = {}) {
     await requireTagger(m.competitions?.grade || '');
     if (!isLiveCode(m.match_code)) throw new Error('This game was not started in the live tagger.');
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
-    const rows = (events || []).map((e) => ({ match_id: m.id, ...toRow(e, teams) }));
+    // In time order, with possessions worked out from the play (a possession
+    // starts on a kick-out, turnover or free and lasts until a score, wide or turnover).
+    const tagged = (events || []).map((e) => ({ match_id: m.id, ...toRow(e, teams) }))
+      .sort((a, b) => (a.start_sec || 0) - (b.start_sec || 0));
+    const rows = withPossessions(tagged, teams).map(({ id, ...r }) => r);
 
     const score = {};
     teams.forEach((t, i) => {

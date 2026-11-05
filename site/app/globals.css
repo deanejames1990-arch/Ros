@@ -520,3 +520,4 @@ input.sheet-no{font:inherit;font-weight:800;padding:6px 2px;border:1px solid #cf
 
 /* Calibri everywhere, including form controls and charts */
 button,input,select,textarea,svg text{font-family:var(--font)}
+.lt-poss{display:block;font-size:.75rem;font-weight:600;color:var(--mut)}
