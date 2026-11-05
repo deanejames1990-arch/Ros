@@ -256,7 +256,7 @@ export default async function Home({ searchParams }) {
 
 // What winning teams do: the stats where being ahead goes with winning.
 function WinningTrends({ win, grade, year }) {
-  const top = win.rows.filter((r) => r.winPct >= 60).slice(0, 3);
+  const top = win.rows.filter((r) => !r.few && r.winPct >= 60).slice(0, 3);
   const fmt = (r, v) => (v == null ? '—' : r.side ? `${v}% of games` : `${v}${r.unit || ''}`);
   const better = (r) => {
     if (r.ros == null) return null;
@@ -286,9 +286,11 @@ function WinningTrends({ win, grade, year }) {
               {win.rows.map((r) => {
                 const ok = better(r);
                 return (
-                  <tr key={r.key}>
+                  <tr key={r.key} className={r.few ? 'win-few' : ''}>
                     <td>{r.short}</td>
-                    <td className="num"><span className="win-bar"><i style={{ width: `${r.winPct}%` }} /></span> <b>{r.winPct}%</b> <small className="muted">of {r.games}</small></td>
+                    <td className="num">{r.few
+                      ? <small className="muted">{r.games ? `${r.winPct}% of ${r.games} — too few games yet` : 'level in every game so far'}</small>
+                      : <><span className="win-bar"><i style={{ width: `${r.winPct}%` }} /></span> <b>{r.winPct}%</b> <small className="muted">of {r.games}</small></>}</td>
                     <td className="num">{r.side ? '—' : fmt(r, r.winners)}</td>
                     <td className="num">{r.side ? '—' : fmt(r, r.losers)}</td>
                     <td className={`num ${ok == null ? '' : ok ? 'win-ok' : 'win-no'}`}>{fmt(r, r.ros)}{ok == null ? '' : ok ? ' ✓' : ' ✗'}</td>

@@ -740,3 +740,4 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .win-bar{display:inline-block;width:70px;height:8px;border-radius:4px;background:var(--soft,#eef0f7);vertical-align:middle;overflow:hidden}
 .win-bar i{display:block;height:100%;background:var(--g)}
 .win-ok{color:#2e7d4f;font-weight:700}.win-no{color:#b3412e;font-weight:700}
+.win-few td{color:var(--mut)}

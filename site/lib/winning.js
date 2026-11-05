@@ -22,7 +22,10 @@ export const WIN_METRICS = [
   { key: 'toLost', label: 'Turnovers lost', short: 'lost the ball fewer times', v: (s) => (s.turnoversWon || s.turnoversLost ? s.turnoversLost : null), low: true },
   { key: 'wides', label: 'Wides', short: 'kicked fewer wides', v: (s) => (s.shots ? s.shotsDetail.wides : null), low: true },
   { key: 'fouls', label: 'Frees conceded', short: 'gave away fewer frees', v: (s) => (s.fouls || null), low: true },
-  { key: 'two', label: 'Two-pointers tried', short: 'tried more two-pointers', v: (s) => (s.shots ? s.shotsDetail.twoTried : null) },
+  // Attempts only count in games where missed two-pointers were tagged.
+  { key: 'two', label: 'Two-point attempts', short: 'tried more two-pointers', v: (s) => (s.shotsDetail?.twoTrackedGames ? s.shotsDetail.twoTried : null) },
+  { key: 'twoPct', label: 'Two-point success %', short: 'landed a higher % of two-point attempts', v: (s) => (s.shotsDetail?.twoTrackedGames && s.shotsDetail.twoTried ? pct(s.shotsDetail.twoScored, s.shotsDetail.twoTried) : null), unit: '%' },
+  { key: 'twoScored', label: 'Two-pointers scored', short: 'scored more two-pointers', v: (s) => (s.shots ? s.shotsDetail.twoScored : null) },
   { key: 'h1', label: 'Won the first half', short: 'won the first half', v: (s, o) => (s.halves?.[0] && o.halves?.[0] ? s.halves[0].points - o.halves[0].points : null), side: true },
   { key: 'q4', label: 'Won the last quarter', short: 'won the last quarter', v: (s, o) => (s.quarters?.[3] && o.quarters?.[3] ? s.quarters[3].points - o.quarters[3].points : null), side: true },
 ];
@@ -56,7 +59,9 @@ export function winningTrends(games) {
       winners: mt.side ? null : avg(wSum, both), losers: mt.side ? null : avg(lSum, both),
       ros: mt.side ? (rN ? pct(rSum, rN) : null) : avg(rSum, rN), rosGames: rN,
     };
-  }).filter((r) => r.games >= 3 && r.winPct != null);
-  rows.sort((x, y) => y.winPct - x.winPct || y.games - x.games);
+  }).filter((r) => r.both > 0);
+  // Enough games to read: sorted by how often being ahead won. The rest after, flagged.
+  rows.forEach((r) => { r.few = r.games < 3 || r.winPct == null; });
+  rows.sort((x, y) => (x.few - y.few) || (y.winPct ?? -1) - (x.winPct ?? -1) || y.games - x.games);
   return { rows, games: decided.length };
 }
