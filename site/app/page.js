@@ -7,8 +7,8 @@ import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
 import { targetFor, targetText, hitRates } from '../lib/targets';
-import { pssSummary } from '../lib/pss';
-import { PssTable } from './report/sections';
+import { pssSummary, quarterTrend } from '../lib/pss';
+import { PssTable, QuarterTrend } from './report/sections';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,13 +72,20 @@ export default async function Home({ searchParams }) {
     if (!raw.length) return [];
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const r = analyseMatch({ events: withoutNames(raw), teams });
-    return teams.map((t) => ({ name: t.name, side: r.byTeam[t.id] }));
+    return teams.map((t, i) => ({ name: t.name, side: r.byTeam[t.id], opp: r.byTeam[teams[1 - i].id] }));
   }))).flat();
   const oppSides = {};
-  for (const r of tagged) (oppSides[r.opp] ||= { v: 0, list: [] }).list.push(r.them), oppSides[r.opp].v += 1;
-  for (const x of scoutedSides) (oppSides[x.name] ||= { v: 0, list: [] }).list.push(x.side);
+  for (const r of tagged) {
+    const o = (oppSides[r.opp] ||= { v: 0, list: [], pairs: [] });
+    o.list.push(r.them); o.pairs.push({ mine: r.them, opp: r.us }); o.v += 1;
+  }
+  for (const x of scoutedSides) {
+    const o = (oppSides[x.name] ||= { v: 0, list: [], pairs: [] });
+    o.list.push(x.side); o.pairs.push({ mine: x.side, opp: x.opp });
+  }
+  const usTrend = quarterTrend(tagged.map((r) => ({ mine: r.us, opp: r.them })));
   const oppRows = Object.entries(oppSides)
-    .map(([name, o]) => ({ name, s: pssSummary(o.list), v: o.v }))
+    .map(([name, o]) => ({ name, s: pssSummary(o.list), v: o.v, trend: quarterTrend(o.pairs) }))
     .filter((r) => r.s)
     .sort((a, b) => b.s.games - a.s.games || a.name.localeCompare(b.name));
   const usAll = combineSides(tagged.map((r) => r.us));
@@ -163,12 +170,13 @@ export default async function Home({ searchParams }) {
           </div>
 
           <h2>Possessions – shots – scores</h2>
+          <QuarterTrend name="Roscommon" trend={usTrend} t={targetFor(grade)} color={ROS} />
           <PssTable t={targetFor(grade)}
             rows={[
-              { name: 'Roscommon', strong: true, color: ROS, href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)) },
-              { name: 'Opposition v Roscommon', color: OPP, s: pssSummary(tagged.map((r) => r.them)) },
+              { name: 'Roscommon', strong: true, color: ROS, href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)), trend: usTrend },
+              { name: 'Opposition v Roscommon', color: OPP, s: pssSummary(tagged.map((r) => r.them)), trend: quarterTrend(tagged.map((r) => ({ mine: r.them, opp: r.us }))) },
               ...oppRows.map((r) => ({
-                name: r.name, s: r.s, note: r.v ? `(${r.v} v Ros)` : '',
+                name: r.name, s: r.s, trend: r.trend, note: r.v ? `(${r.v} v Ros)` : '',
                 href: `/team/${encodeURIComponent(r.name)}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`,
               })),
             ]}

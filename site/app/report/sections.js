@@ -35,6 +35,7 @@ export function PssTable({ rows, t, caption }) {
               <th title="Scores from shots">Shot → score</th>
               <th title="Scores from possessions">Poss → score</th>
               <th>Pts a game</th>
+              {shown.some((r) => r.trend) && <th>Best quarter</th>}
             </tr>
           </thead>
           <tbody>
@@ -52,6 +53,7 @@ export function PssTable({ rows, t, caption }) {
                   <td>{s.shotToScore == null ? '–' : `${s.shotToScore}%`}</td>
                   <td>{s.possToScore == null || !s.hasPoss ? '–' : `${s.possToScore}%`}</td>
                   <td>{f1(g.points)}</td>
+                  {shown.some((x) => x.trend) && <td>{r.trend ? <>{r.trend.best.q} <small className="muted">{r.trend.best.against != null ? `${r.trend.best.points - r.trend.best.against >= 0 ? '+' : '−'}${Math.abs(r.trend.best.points - r.trend.best.against).toFixed(1)}` : `${r.trend.best.points.toFixed(1)} pts`}</small></> : '–'}</td>}
                 </tr>
               );
             })}
@@ -59,6 +61,42 @@ export function PssTable({ rows, t, caption }) {
         </table>
       </div>
       {caption && <p className="muted small">{caption}</p>}
+    </div>
+  );
+}
+
+// Call-out: a team's best and weakest quarter across games, with a strip of
+// every quarter's average. trend: quarterTrend(...).
+export function QuarterTrend({ name, trend, t, color = '#3b4f9e' }) {
+  if (!trend || trend.games < 1) return null;
+  const { best, worst, quarters, games } = trend;
+  const line = (q) => `${q.poss ? `${q.poss.toFixed(1)}-` : ''}${q.shots.toFixed(1)}-${q.scores.toFixed(1)}`;
+  const won = (q) => (q.vs ? `; won it in ${q.won} of ${q.vs} game${q.vs === 1 ? '' : 's'}` : '');
+  const mg = (q) => (q.against == null ? '' : ` (${q.points - q.against >= 0 ? '+' : '−'}${Math.abs(q.points - q.against).toFixed(1)} a game)`);
+  const max = Math.max(1, ...quarters.map((q) => Math.max(q.points, q.against || 0)));
+  return (
+    <div className="card q-trend">
+      <p className="q-call"><b>{name}’s best quarter is {best.q}</b>{mg(best)}: {best.points.toFixed(1)} points{best.against != null ? ` v ${best.against.toFixed(1)}` : ''} from {line(best)}{won(best)}.
+        {games > 1 && worst.q !== best.q && <> Weakest is <b>{worst.q}</b>{mg(worst)}: {worst.points.toFixed(1)} points{worst.against != null ? ` v ${worst.against.toFixed(1)}` : ''} from {line(worst)}{won(worst)}.</>}
+      </p>
+      <div className="q-strip">
+        {quarters.map((q) => {
+          const h = t && q.poss ? hit({ poss: Math.round(q.poss * 10) / 10, shots: Math.round(q.shots * 10) / 10, scores: Math.round(q.scores * 10) / 10 }, t) : null;
+          return (
+            <div key={q.q} className={`q-cell ${q.q === best.q ? 'best' : ''}`}>
+              <span className="stat-k">{q.q}{q.q === best.q ? ' · best' : q.q === worst.q && games > 1 ? ' · weakest' : ''}</span>
+              <div className="q-bars" title={`${q.q}: ${q.points.toFixed(1)} points a game${q.against != null ? `, conceding ${q.against.toFixed(1)}` : ''}`}>
+                <i style={{ height: `${(100 * q.points) / max}%`, background: color }} />
+                {q.against != null && <i style={{ height: `${(100 * q.against) / max}%`, background: '#c4572a' }} />}
+              </div>
+              <b className="num">{q.points.toFixed(1)}{q.against != null && <small> v {q.against.toFixed(1)}</small>}</b>
+              <span className={`small ${h?.all ? 'pss-ok' : ''}`}>{line(q)}</span>
+              {q.vs > 0 && <span className="muted small">won {q.won}/{q.vs}</span>}
+            </div>
+          );
+        })}
+      </div>
+      <p className="muted small">Points a game in each quarter{quarters[0].against != null ? ' (bar on the right: points conceded)' : ''}, with possessions-shots-scores, over {games} game{games === 1 ? '' : 's'}.</p>
     </div>
   );
 }

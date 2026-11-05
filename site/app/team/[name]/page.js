@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../../../lib/analysis';
-import { CompareTypes, QuarterTargets, PssTable } from '../../report/sections';
-import { pssSummary } from '../../../lib/pss';
+import { CompareTypes, QuarterTargets, PssTable, QuarterTrend } from '../../report/sections';
+import { pssSummary, quarterTrend } from '../../../lib/pss';
 import { targetFor } from '../../../lib/targets';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -223,9 +223,10 @@ export default async function TeamReport({ params, searchParams }) {
       ) : (
         <>
           <h2>Possessions – shots – scores</h2>
+          <QuarterTrend name={teamName} trend={quarterTrend(tagged.map((d) => ({ mine: d.mine, opp: d.opp })))} t={targetFor(grade)} color={TEAM} />
           <PssTable t={targetFor(grade)} rows={[
-            { name: teamName, strong: true, color: TEAM, s: pssSummary(tagged.map((d) => d.mine)) },
-            { name: tagged.length === 1 ? tagged[0].oppName : 'Opposition', color: OPP, s: pssSummary(tagged.map((d) => d.opp)) },
+            { name: teamName, strong: true, color: TEAM, s: pssSummary(tagged.map((d) => d.mine)), trend: quarterTrend(tagged.map((d) => ({ mine: d.mine, opp: d.opp }))) },
+            { name: tagged.length === 1 ? tagged[0].oppName : 'Opposition', color: OPP, s: pssSummary(tagged.map((d) => d.opp)), trend: quarterTrend(tagged.map((d) => ({ mine: d.opp, opp: d.mine }))) },
             ...(!comp && types.length > 1 ? ['League', 'Championship'].map((ty) => {
               const ds = tagged.filter((d) => compType(d.m.competitions?.name) === ty);
               return { name: `${teamName} · ${ty}`, s: pssSummary(ds.map((d) => d.mine)) };
