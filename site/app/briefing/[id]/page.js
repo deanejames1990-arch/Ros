@@ -60,7 +60,7 @@ export default async function Briefing({ params, searchParams }) {
       {admin && searchParams.edit && <Editor b={b} candidates={d.candidates} sections={SECTIONS} />}
       <div className="hero" data-export-title={`${b.title} · ${rows.length} games`}>
         <h1><Crest name={team.name} src={crests.byId[team.id]} size={44} className="brief-crest" />{b.title}{!b.published && <span className="muted"> · draft</span>}</h1>
-        <PrintButton />
+        <div className="brief-actions no-print"><a className="button primary" href={`/briefing/${b.id}/card`}>Infographic</a><PrintButton /></div>
       </div>
       <SectionImages />
 
