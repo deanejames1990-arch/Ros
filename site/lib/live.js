@@ -10,6 +10,7 @@
 //   Foul       team_id = team that conceded the free
 //   Card       team_id = player's team; outcome Yellow / Black / Red
 //   Throw In   team_id = team that won the throw-in at the start of a half
+//   Sub        team_id = team making it; labels Off / On (names or #n), OffJersey / OnJersey
 
 export const LIVE_PREFIX = 'LIVE-';
 export const isLiveCode = (code) => String(code || '').startsWith(LIVE_PREFIX);
@@ -101,6 +102,11 @@ export function toRow(ev, teams) {
       row.outcome = `${teams.find((t) => t.id === ev.team)?.name || ''} won`.trim();
       player(ev.player);
       break;
+    case 'sub':
+      row.event_type = 'Sub';
+      if (ev.off) { labels.Off = ev.off.name || `#${ev.off.no}`; if (ev.off.no) labels.OffJersey = ev.off.no; }
+      if (ev.on) { labels.On = ev.on.name || `#${ev.on.no}`; if (ev.on.no) labels.OnJersey = ev.on.no; }
+      break;
     case 'card':
       row.event_type = 'Card';
       row.outcome = ev.outcome;
@@ -133,6 +139,10 @@ export function fromRow(r, teams) {
     case 'Foul': return { ...ev, kind: 'foul', third: third(l.PitchArea), player: l.FreeWonBy ? { no: Number(l.Jersey) || Number(String(l.FreeWonBy).replace('#', '')) || null, name: named(l.FreeWonBy) } : null };
     case 'Card': return { ...ev, kind: 'card', outcome: r.outcome, player };
     case 'Throw In': return { ...ev, kind: 'throw', player };
+    case 'Sub': {
+      const side = (n, no) => (n || no ? { no: Number(no) || Number(String(n || '').replace('#', '')) || null, name: named(n) } : null);
+      return { ...ev, kind: 'sub', off: side(l.Off, l.OffJersey), on: side(l.On, l.OnJersey) };
+    }
     default:
       if (/^shot/i.test(r.event_type || '')) {
         const type = /\(F\)/.test(r.event_type) ? 'Free' : /\(45\)/.test(r.event_type) ? '45' : /\(Mark\)/.test(r.event_type) ? 'Mark' : 'Play';

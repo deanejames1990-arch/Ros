@@ -377,7 +377,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   }
 
   const unknownTypes = [...new Set(all.map((e) => e.event_type))].filter(
-    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul', 'Attack', 'Throw In', 'Tackle', 'Assist', 'Card'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
+    (t) => !['Poss', 'Kickout', 'Turnover', 'Foul', 'Attack', 'Throw In', 'Tackle', 'Assist', 'Card', 'Sub'].includes(t) && !(t || '').toLowerCase().startsWith('shot')
   );
   const has = (type) => all.some((e) => e.event_type === type);
   const hasLabel = (k) => all.some((e) => lbl(e, k));

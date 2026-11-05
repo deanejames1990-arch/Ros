@@ -81,7 +81,7 @@ function teamList(rows) {
   };
   for (const g of rows) {
     const id = g.m.id;
-    const end = 70;
+    const end = 2 * (Number(String(g.m.match_code || '').match(/^LIVE-\d+-(\d+)/)?.[1]) || (g.m.competitions?.grade === 'Senior' ? 35 : 30));
     for (const a of g.apps) {
       if (!a.players?.name) continue;
       const p = row(a.players.name);

@@ -22,7 +22,7 @@ const store = {
 const SHOT_OUT = [['Point', 'Point'], ['2 Point', '2-Pointer'], ['Goal', 'Goal'], ['Wide', 'Wide'], ['Short', 'Short'], ['Saved', 'Saved'], ['Blocked', 'Blocked'], ['Off post', 'Post']];
 const KO_OUT = [[true, 'Clean', 'Won clean'], [true, 'Break', 'Won break'], [false, 'Break', 'Lost break'], [false, 'Clean', 'Lost clean']];
 const THIRDS = [['Def', 'Defence'], ['Mid', 'Middle'], ['Att', 'Attack']];
-const NEEDS = { shot: 'outcome', ko: 'how', card: 'outcome' }; // saved once this is chosen
+const NEEDS = { shot: 'outcome', ko: 'how', card: 'outcome', sub: 'on' }; // saved once this is chosen
 
 function describe(e, teams) {
   const t = teams.find((x) => x.id === e.team)?.name || '';
@@ -35,12 +35,13 @@ function describe(e, teams) {
     case 'foul': return `${t} free conceded${e.third ? ` · ${e.third.toLowerCase()}` : ''}${e.player ? ` · won by ${e.player.name || `#${e.player.no}`}` : ''}`;
     case 'card': return `${t} ${String(e.outcome).toLowerCase()} card${who}`;
     case 'throw': return `${t} won the throw-in${who}`;
+    case 'sub': { const n = (p) => (p ? p.name || `#${p.no}` : '?'); return `${t} sub: ${n(e.on)} on for ${n(e.off)}`; }
     default: return e.kind;
   }
 }
 
-function Players({ sheet, value, onPick, color }) {
-  const [subs, setSubs] = useState(false);
+function Players({ sheet, value, onPick, color, startSubs = false }) {
+  const [subs, setSubs] = useState(startSubs);
   // Subs page: 16–26 (the full panel of 26), plus any higher number on the sheet.
   const extra = Object.keys(sheet).map(Number).filter((n) => n > 26).sort((a, b) => a - b);
   const nums = subs ? [...Array.from({ length: 11 }, (_, i) => i + 16), ...extra] : Array.from({ length: 15 }, (_, i) => i + 1);
@@ -381,6 +382,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
                 <button type="button" onClick={() => start('to', t.id)}>Turnover won</button>
                 <button type="button" onClick={() => start('foul', t.id)}>Free conceded</button>
                 <button type="button" onClick={() => start('card', t.id)}>Card</button>
+                <button type="button" onClick={() => start('sub', t.id)}>Sub</button>
               </div>
             </div>
           ))}
@@ -483,7 +485,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         <div className="lt-sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) done(); }}>
           <div className="lt-panel" style={{ '--tc': COLORS[editTeam] }}>
             <div className="lt-panel-head">
-              <b>{teams[editTeam].name} {{ shot: 'shot', ko: 'kick-out', to: 'turnover won', foul: 'free conceded', card: 'card' }[edit.kind]}</b>
+              <b>{teams[editTeam].name} {{ shot: 'shot', ko: 'kick-out', to: 'turnover won', foul: 'free conceded', card: 'card', sub: 'substitution' }[edit.kind]}</b>
               <span className="muted num">{edit.half === 2 ? '2H' : '1H'} {mmss(edit.sec)}</span>
             </div>
 
@@ -534,6 +536,16 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
               </>
             )}
 
+            {edit.kind === 'sub' && (
+              <>
+                <div className="lt-label">Coming off</div>
+                <Players sheet={sheetOf(edit.team)} value={edit.off} color={COLORS[editTeam]} onPick={(p) => update({ off: p })} />
+                <div className="lt-label">Coming on</div>
+                <Players sheet={sheetOf(edit.team)} value={edit.on} color={COLORS[editTeam]} onPick={(p) => update({ on: p })} startSubs />
+                <p className="muted small">The minute goes on the team sheet, so each player’s minutes add up game by game. Put the sub on the sheet (16–26) for their name.</p>
+              </>
+            )}
+
             {edit.kind === 'card' && (
               <>
                 <div className="lt-out">
@@ -552,7 +564,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
               ) : (
                 <>
                   <button type="button" onClick={() => setEdit(null)}>Cancel</button>
-                  <span className="muted small">Pick {edit.kind === 'ko' ? 'who won it' : 'the result'} to save</span>
+                  <span className="muted small">Pick {edit.kind === 'ko' ? 'who won it' : edit.kind === 'sub' ? 'who came on' : 'the result'} to save</span>
                 </>
               )}
             </div>
