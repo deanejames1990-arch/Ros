@@ -8,6 +8,7 @@ import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
 import { nameEvents } from '../../../lib/players';
+import { getAliases } from '../../../lib/aliases';
 import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -51,9 +52,10 @@ export default async function TeamReport({ params, searchParams }) {
     : { data: [] };
 
   // Analyse every tagged game and keep this team's side and the opposition's side.
+  const aliases = await getAliases();
   const analysed = await Promise.all(inSeason.map(async (m) => {
     const t2 = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
-    const raw = nameEvents(await loadEvents(m.id), (seasonApps || []).filter((a) => a.match_id === m.id), t2);
+    const raw = nameEvents(await loadEvents(m.id), (seasonApps || []).filter((a) => a.match_id === m.id), t2, aliases);
     // Underage names: admins only.
     const events = m.competitions?.show_player_names === false && role !== 'admin' ? withoutNames(raw) : raw;
     if (!events.length) return { m, tagged: false };
@@ -240,7 +242,7 @@ export default async function TeamReport({ params, searchParams }) {
           )}
           <PeriodSection A={A} B={B} a={a} b={b} perGame={tagged.map((d) => ({ mine: d.mine, opp: d.opp }))} />
           <TurnoverSection A={A} B={B} a={a} />
-          <h2>{teamName} players</h2>
+          <h2>{teamName} players{role === 'admin' && <a className="small no-print h2-link" href={`/admin/names?team=${encodeURIComponent(teamName)}`}>Tidy names</a>}</h2>
           <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} links={(() => {
             const l = (seasonApps || []).filter((x) => ids.includes(x.team_id) && x.players);
             return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;

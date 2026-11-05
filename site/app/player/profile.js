@@ -3,6 +3,7 @@ import { db, loadEvents, hiddenPlayerIds } from '../../lib/db';
 import { currentRole, currentAccess, gradeOk } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
+import { getAliases } from '../../lib/aliases';
 import { ShotMap, ShotLegend, hasShotMap } from '../report/ShotMap';
 import { ZoneGrid } from '../report/sections';
 import MergePlayer from './[id]/MergePlayer';
@@ -46,6 +47,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
     .sort((a, b) => b.matches.match_date.localeCompare(a.matches.match_date));
 
   // Each game: this player's row from the tags, named from that game's team sheets.
+  const aliases = await getAliases();
   const myShots = [];
   const games = await Promise.all(list.map(async (a) => {
     const m = a.matches;
@@ -54,7 +56,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
       db.from('appearances').select('team_id, jersey_no, players(name)').eq('match_id', m.id),
       loadEvents(m.id),
     ]);
-    const events = nameEvents(raw, sheet || [], teams);
+    const events = nameEvents(raw, sheet || [], teams, aliases);
     const r = analyseMatch({ events, teams });
     const row = r.byTeam[a.team_id]?.players.find((x) => x.name.toLowerCase() === p.name.toLowerCase()) || null;
     for (const e of events) {

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db, MATCH_SELECT, loadEvents } from '../../../../lib/db';
 import { analyseMatch } from '../../../../lib/analysis';
 import { nameEvents } from '../../../../lib/players';
+import { getAliases } from '../../../../lib/aliases';
 import { GameForm, DeleteGame } from '../../forms';
 import { sheetData } from '../../../../lib/sheets-data';
 import SheetEditor from '../../SheetEditor';
@@ -29,7 +30,7 @@ export default async function EditGame({ params }) {
   ]);
   // Names already in the tags, per team, for "Add names from the tags".
   if (raw.length) {
-    const r = analyseMatch({ events: nameEvents(raw, apps || [], sides), teams: sides });
+    const r = analyseMatch({ events: nameEvents(raw, apps || [], sides, await getAliases()), teams: sides });
     for (const t of sides) {
       sheets[t.id].tagNames = (r.byTeam[t.id]?.players || []).map((p) => p.name).filter((n) => !/^#?\d+$/.test(n));
     }

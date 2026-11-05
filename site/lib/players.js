@@ -8,10 +8,53 @@ const lbl = (e, k) => e.labels?.[k];
 const NUM = /^#?(\d{1,2})$/;
 
 // apps: [{ team_id, jersey_no, players: { name } }]; teams: [{ id, name }]
-export function nameEvents(events, apps, teams) {
-  if (!apps?.length) return events;
-  const byNo = new Map(apps.filter((a) => a.jersey_no && a.players?.name).map((a) => [`${a.team_id}:${a.jersey_no}`, a.players.name]));
-  if (!byNo.size) return events;
+// aliases: [{ team_id, alias, name }] from Tidy names ("Lundy" -> "Ciarán Lundy").
+export function nameEvents(events, apps, teams, aliases = []) {
+  const byNo = new Map((apps || []).filter((a) => a.jersey_no && a.players?.name).map((a) => [`${a.team_id}:${a.jersey_no}`, a.players.name]));
+  const ids = new Set(teams.map((t) => t.id));
+  const byAlias = new Map((aliases || []).filter((a) => ids.has(a.team_id)).map((a) => [`${a.team_id}:${String(a.alias).trim().toLowerCase()}`, a.name]));
+  if (!byNo.size && !byAlias.size) return events;
+  const named = byNo.size ? numbersToNames(events, byNo, teams) : events;
+  return byAlias.size ? applyAliases(named, byAlias, teams) : named;
+}
+
+function teamHelpers(teams) {
+  const other = (id) => teams.find((t) => t.id !== id)?.id;
+  const winnerOf = (e) => {
+    const o = String(e.outcome || '').toLowerCase();
+    const w = teams.filter((t) => o.startsWith(t.name.toLowerCase())).sort((a, b) => b.name.length - a.name.length)[0];
+    return w ? w.id : e.team_id;
+  };
+  return { other, winnerOf };
+}
+
+// Swap tag names for their tidied full names, team by team.
+function applyAliases(events, byAlias, teams) {
+  const { other, winnerOf } = teamHelpers(teams);
+  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${x.trim().toLowerCase()}`) || x.trim()).join(', ');
+  return events.map((e) => {
+    const l = e.labels || {};
+    if (!l.Players && !l.WonBackBy && !l.FreeWonBy && !e.player_no) return e;
+    const labels = { ...l };
+    let changed = false;
+    let playerNo = e.player_no;
+    const own = e.event_type === 'Kickout' ? winnerOf(e) : e.event_type === 'Foul' && l.FreeWonBy ? other(e.team_id) : e.team_id;
+    if (labels.Players) { const v = fix(labels.Players, own); if (v !== labels.Players) { labels.Players = v; changed = true; } }
+    // Some files put the name in player_no too (it's read first for shots).
+    if (playerNo && !/^#?\d+$/.test(String(playerNo))) {
+      const v = fix(playerNo, own);
+      if (v !== String(playerNo)) { if (!labels.Players) labels.Players = v; playerNo = v; changed = true; }
+    }
+    for (const k of ['WonBackBy', 'FreeWonBy']) {
+      if (!labels[k]) continue;
+      const v = fix(labels[k], other(e.team_id));
+      if (v !== labels[k]) { labels[k] = v; changed = true; }
+    }
+    return changed ? { ...e, labels, player_no: playerNo } : e;
+  });
+}
+
+function numbersToNames(events, byNo, teams) {
   const other = (id) => teams.find((t) => t.id !== id)?.id;
   const winnerOf = (e) => {
     const o = String(e.outcome || '').toLowerCase();

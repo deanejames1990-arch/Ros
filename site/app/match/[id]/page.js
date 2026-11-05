@@ -10,6 +10,7 @@ import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
 import { nameEvents } from '../../../lib/players';
+import { getAliases } from '../../../lib/aliases';
 import { targetFor, targetText, hit } from '../../../lib/targets';
 import { Pss } from '../../report/sections';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -35,6 +36,7 @@ export default async function Match({ params, searchParams }) {
     loadEvents(m.id),
   ]);
 
+  const aliases = await getAliases();
   const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
   const rosIdx = teams.findIndex((t) => /roscommon/i.test(t.name));
   const colors = teams.map((_, i) => (rosIdx === -1 ? (i === 0 ? ROS : OPP) : i === rosIdx ? ROS : OPP));
@@ -42,7 +44,7 @@ export default async function Match({ params, searchParams }) {
 
   // Underage competitions hide player names everywhere on the page.
   // Tags made by number get the name from the team sheet.
-  const namedEvents = nameEvents(rawEvents, apps || [], teams);
+  const namedEvents = nameEvents(rawEvents, apps || [], teams, aliases);
   const events = showNames ? namedEvents : withoutNames(namedEvents);
   const r = analyseMatch({ events, teams, match: m, period });
   const a = r.byTeam[A.id];

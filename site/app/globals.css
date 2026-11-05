@@ -548,3 +548,14 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .q-record span{background:#f7f9fc;border-radius:8px;padding:5px 10px;font-size:.88rem}
 .q-record span.up{background:#e3f1e5}
 .q-record span.down{background:#f6dede}
+.alias-table{width:100%;border-collapse:collapse}
+.alias-table td,.alias-table th{padding:8px 6px;border-top:1px solid #eef1f7;text-align:left;vertical-align:top}
+.alias-table tr.done{background:#f3faf4}
+.alias-edit{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.alias-edit input{font:inherit;padding:7px 9px;border:1px solid #cfd6e4;border-radius:8px;min-width:220px}
+.alias-edit button{padding:7px 12px}
+.alias-sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.alias-sugg button{background:#eef1f7;padding:5px 10px;font-size:.82rem}
+.search select{font:inherit;padding:9px;border:1px solid #cfd6e4;border-radius:8px}
+.h2-link{margin-left:12px;font-weight:600;font-family:var(--font);font-size:.85rem}
+.alias-table tr.todo td:first-child{border-left:4px solid var(--gold)}

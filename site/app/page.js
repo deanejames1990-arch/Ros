@@ -1,6 +1,7 @@
 import { db, MATCH_SELECT, loadEvents } from '../lib/db';
 import { analyseMatch, combineSides, withoutNames, compType } from '../lib/analysis';
 import { nameEvents } from '../lib/players';
+import { getAliases } from '../lib/aliases';
 import { isLiveNow } from '../lib/live';
 import { currentAccess, gradeOk } from '../lib/session';
 import { score } from './components';
@@ -41,6 +42,7 @@ export default async function Home({ searchParams }) {
   const { data: apps } = season.length
     ? await db.from('appearances').select('match_id, team_id, jersey_no, players(id, name)').in('match_id', season.map((m) => m.id))
     : { data: [] };
+  const aliases = await getAliases();
   const rows = await Promise.all(season.map(async (m) => {
     const usFirst = US.test(m.team1.name);
     const usId = usFirst ? m.team1_id : m.team2_id;
@@ -57,7 +59,7 @@ export default async function Home({ searchParams }) {
     const raw = await loadEvents(m.id);
     if (!raw.length) return base;
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
-    let events = nameEvents(raw, (apps || []).filter((x) => x.match_id === m.id), teams);
+    let events = nameEvents(raw, (apps || []).filter((x) => x.match_id === m.id), teams, aliases);
     if (m.competitions?.show_player_names === false && !admin) events = withoutNames(events);
     const r = analyseMatch({ events, teams });
     return { ...base, us: r.byTeam[usId], them: r.byTeam[oppId] };
