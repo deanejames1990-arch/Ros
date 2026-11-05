@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { setAlias } from './actions';
 
+const NOT = 'Not a player'; // same as NOT_A_PLAYER in lib/players
+
 function Row({ teamId, r, listId }) {
   const [val, setVal] = useState(r.alias);
   const [saved, setSaved] = useState(r.alias);
@@ -13,6 +15,14 @@ function Row({ teamId, r, listId }) {
     if (res.ok) { setSaved(res.cleared ? '' : res.name); setVal(res.cleared ? '' : res.name); setMsg(res.cleared ? 'Cleared' : 'Saved'); }
     else setMsg(res.error);
   };
+  if (saved === NOT) {
+    return (
+      <tr className="done notplayer">
+        <td><s>{r.name}</s><div className="muted small">{r.games} game{r.games === 1 ? '' : 's'} · {r.actions} tags</div></td>
+        <td><span className="badge-off">Not a player</span> — left out of every player table. <button type="button" className="linkish" onClick={() => save('')}>Undo</button>{msg && msg !== 'Saved' && <span className="muted small"> {msg}</span>}</td>
+      </tr>
+    );
+  }
   return (
     <tr className={saved ? 'done' : r.short ? 'todo' : ''}>
       <td><b>{r.name}</b>{r.short && !saved && <span className="badge-off"> surname only</span>}<div className="muted small">{r.games} game{r.games === 1 ? '' : 's'}{r.points ? ` · ${r.points} pts` : ''} · {r.actions} tags</div></td>
@@ -21,6 +31,7 @@ function Row({ teamId, r, listId }) {
           <input list={listId} value={val} placeholder="Full name" onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
           <button type="button" onClick={() => save()} disabled={val === saved}>Save</button>
           {saved && <button type="button" className="linkish" onClick={() => save('')}>Clear</button>}
+          {!saved && <button type="button" className="linkish" title="A descriptor (e.g. Ball Over Top), not a player: leave it out of the player tables" onClick={() => save(NOT)}>Not a player</button>}
         </div>
         {!saved && r.suggest.length > 0 && (
           <div className="alias-sugg">
@@ -78,7 +89,7 @@ export default function NameRows({ teamId, teamName, rows, squad, dupes = [] }) 
           <tbody>{rows.map((r) => <Row key={r.name} teamId={teamId} r={r} listId={listId} />)}</tbody>
         </table>
       </div>
-      <p className="muted small">Leave a name blank if it’s already right. Changes show on every dashboard, report and profile straight away.</p>
+      <p className="muted small">Leave a name blank if it’s already right. A tag that isn’t a player at all (Ball Over Top, Def Shape): tap <b>Not a player</b>. Changes show on every dashboard, report and profile straight away.</p>
     </div>
     </>
   );

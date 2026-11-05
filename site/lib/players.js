@@ -13,8 +13,10 @@ export const isSideTag = (v) => /^(team\s*)?[ab]$/i.test(String(v || '').trim())
 // Descriptors that some taggers put in the player group: "Tech Foul",
 // "Technical Foul", or on the end of a name ("Ronan Fox - Technical Foul").
 // (Deliberately leaves out words that are also first names, e.g. Mark.)
-const NOT_PLAYER = /\b(tech|technical|fouls?|fouled|card|yellow|red card|black card|discipline|dissent|kick\s?-?outs?|turnover|penalty|steps|over\s?carry|overcarry|throw\s?ball|handpass|hand pass|free kick|frees?|sideline|45s?|square ball|advantage|sin bin)\b/i;
+const NOT_PLAYER = /\b(over (the )?top|ball over|(def|defensive|att|attacking|attack) (shape|press|structure|set ?up)|shape|high press|press(ing)? (high|on)|counter ?attack|kick ?pass|long ball|high ball|break(ing)? ball|transition|overlap|sweeper|zonal|man to man|set (play|piece)|tech|technical|fouls?|fouled|card|yellow|red card|black card|discipline|dissent|kick\s?-?outs?|turnover|penalty|steps|over\s?carry|overcarry|throw\s?ball|handpass|hand pass|free kick|frees?|sideline|45s?|square ball|advantage|sin bin)\b/i;
 export const isNotPlayer = (v) => NOT_PLAYER.test(String(v || ''));
+// Tidy names can mark any other tag as not a player: its alias is this.
+export const NOT_A_PLAYER = 'Not a player';
 // One tag name tidied: the descriptor taken off the end, or null if it's not a player at all.
 export function cleanTagName(v) {
   const s = String(v ?? '').trim();
@@ -61,7 +63,7 @@ function teamHelpers(teams) {
 // Swap tag names for their tidied full names, team by team.
 function applyAliases(events, byAlias, teams) {
   const { other, winnerOf } = teamHelpers(teams);
-  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${x.trim().toLowerCase()}`) || x.trim()).join(', ');
+  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${x.trim().toLowerCase()}`) || x.trim()).filter((x) => x && x !== NOT_A_PLAYER).join(', ');
   return events.map((e) => {
     const l = e.labels || {};
     if (!l.Players && !l.WonBackBy && !l.FreeWonBy && !e.player_no) return e;
@@ -69,16 +71,16 @@ function applyAliases(events, byAlias, teams) {
     let changed = false;
     let playerNo = e.player_no;
     const own = e.event_type === 'Kickout' ? winnerOf(e) : e.event_type === 'Foul' && l.FreeWonBy ? other(e.team_id) : e.team_id;
-    if (labels.Players) { const v = fix(labels.Players, own); if (v !== labels.Players) { labels.Players = v; changed = true; } }
+    if (labels.Players) { const v = fix(labels.Players, own); if (v !== labels.Players) { if (v) labels.Players = v; else delete labels.Players; changed = true; } }
     // Some files put the name in player_no too (it's read first for shots).
     if (playerNo && !isNumberTag(playerNo)) {
       const v = fix(playerNo, own);
-      if (v !== String(playerNo)) { if (!labels.Players) labels.Players = v; playerNo = v; changed = true; }
+      if (v !== String(playerNo)) { if (!labels.Players && v) labels.Players = v; playerNo = v || null; changed = true; }
     }
     for (const k of ['WonBackBy', 'FreeWonBy']) {
       if (!labels[k] || isSideTag(labels[k])) continue;
       const v = fix(labels[k], other(e.team_id));
-      if (v !== labels[k]) { labels[k] = v; changed = true; }
+      if (v !== labels[k]) { if (v) labels[k] = v; else delete labels[k]; changed = true; }
     }
     return changed ? { ...e, labels, player_no: playerNo } : e;
   });
