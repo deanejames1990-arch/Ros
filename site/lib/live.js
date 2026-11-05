@@ -160,7 +160,10 @@ export function liveScore(events, teamId) {
 //                  a new possession for them (opposition kick-out)
 //   turnover    -> new possession for the team that won the ball
 //   free won by the team without the ball -> new possession for them
-//   score / wide -> possession over; the next one starts from the kick-out
+//   score / wide -> possession over; the other team's possession starts at once
+//     (their kick-out). The kick-out tag then keeps it, or hands it over if lost.
+//     One left hanging at the end of a half is dropped (unless `open`, for a
+//     game still being tagged, so the count shows straight away)
 //   short, saved, blocked, off the post -> over unless the same team gets it back
 //     (a 45, a mark, a rebound), which stays the same possession; if the other
 //     team plays it next, that's a possession for them from the shot dropping short
@@ -171,7 +174,7 @@ export function liveScore(events, teamId) {
 // Rows are events-table rows (team_id, event_type, outcome, labels…). Returns the
 // rows with 'Poss' rows added just before the event that started each
 // possession; any possessions already in the list are replaced.
-export function withPossessions(rows, teams) {
+export function withPossessions(rows, teams, { open = false } = {}) {
   const other = (id) => teams.find((t) => t.id !== id)?.id;
   const winnerOf = (e) => {
     const o = String(e.outcome || '').toLowerCase();
@@ -185,12 +188,14 @@ export function withPossessions(rows, teams) {
   let loose = null;   // team whose shot was short / saved: theirs again if they get it back
   let half = null;
   let started = false; // any possession yet this half (the first one is the throw-in)
-  const start = (teamId, from, e) => {
+  let pending = null; // the possession started by a score / wide, until the next event
+  const start = (teamId, from, e, at = 0, tag = 'p') => {
     if (!teamId) return;
+    pending = null;
     out.push({
       ...(e.match_id ? { match_id: e.match_id } : {}),
-      ...(e.id != null ? { id: `${e.id}p` } : {}),
-      team_id: teamId, event_type: 'Poss', outcome: null, minute: e.minute, half: e.half, start_sec: e.start_sec,
+      ...(e.id != null ? { id: `${e.id}${tag}` } : {}),
+      team_id: teamId, event_type: 'Poss', outcome: null, minute: e.minute, half: e.half, start_sec: e.start_sec == null ? e.start_sec : Number(e.start_sec) + at,
       player_no: null, code: 'Live', labels: { Half: e.labels?.Half || e.half, Quarter: e.labels?.Quarter, PossFrom: started ? from : 'Throw Up', Auto: true },
     });
     current = teamId; loose = null; started = true;
@@ -210,14 +215,21 @@ export function withPossessions(rows, teams) {
   for (const e of list) {
     if (e.event_type === 'Poss') continue; // worked out here instead
     const h = e.half || e.labels?.Half;
-    if (h !== half) { half = h; current = null; loose = null; started = false; }
+    if (h !== half) {
+      if (pending) out.splice(out.indexOf(pending), 1); // the half ended before that kick-out
+      half = h; current = null; loose = null; started = false; pending = null;
+    }
+    const after = pending; // possession waiting on this event, from a score / wide
+    pending = null;
     if (e.event_type === 'Throw In') {
       start(e.team_id, 'Throw Up', e);
     } else if (e.event_type === 'Kickout') {
       // The kick-out is a possession for the kicking team. Winning it keeps
       // that same possession; losing it starts one for the other team.
       started = true; // a kick-out is never the throw-in
-      start(e.team_id, 'Own Kickout', e);
+      // Started already by the score / wide before it; otherwise starts here.
+      if (after && current !== e.team_id) out.splice(out.indexOf(after), 1); // kicked by the other side after all
+      if (!(after && current === e.team_id)) start(e.team_id, 'Own Kickout', e);
       const w = winnerOf(e);
       if (w && w !== e.team_id) start(w, 'Opp Kickout', e);
     } else if (e.event_type === 'Turnover') {
@@ -236,10 +248,16 @@ export function withPossessions(rows, teams) {
         else start(e.team_id, loose ? 'Opp shot dropped short' : 'Other', e);
       }
       out.push(e);
-      if (ends(e)) { current = null; loose = null; } else { loose = e.team_id; current = null; }
+      if (ends(e)) {
+        loose = null;
+        // The other team's kick-out: their possession starts now.
+        start(other(e.team_id), 'Own Kickout', e, 0.1, 'k');
+        pending = out[out.length - 1];
+      } else { loose = e.team_id; current = null; }
       continue;
     }
     out.push(e);
   }
+  if (pending && !open) out.splice(out.indexOf(pending), 1); // nothing after the last score
   return out;
 }

@@ -1,5 +1,7 @@
 import { db, MATCH_SELECT } from '../../lib/db';
 import { currentAccess, gradeOk } from '../../lib/session';
+import { getCrests } from '../../lib/crests';
+import Crest from '../Crest';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Teams · James Deane Analysis' };
@@ -10,13 +12,14 @@ const gOrder = (g) => ORDER.indexOf(g) + 1 || 99;
 // Every county with games on the site, each linking to its combined report.
 export default async function Teams() {
   const access = await currentAccess();
+  const { byId: crests } = await getCrests();
   const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(2000);
   const matches = (all || []).filter((m) => gradeOk(access, m.competitions?.grade));
   const teams = {};
   for (const m of matches || []) {
-    for (const t of [m.team1, m.team2]) {
+    for (const t of [{ ...m.team1, id: m.team1_id }, { ...m.team2, id: m.team2_id }]) {
       const k = t.name;
-      const r = (teams[k] ||= { name: k, games: 0, grades: {}, last: m.match_date, vsRos: 0 });
+      const r = (teams[k] ||= { name: k, id: t.id, games: 0, grades: {}, last: m.match_date, vsRos: 0 });
       r.games += 1;
       const g = m.competitions?.grade || 'Senior';
       const y = m.competitions?.seasons?.year;
@@ -36,7 +39,7 @@ export default async function Teams() {
       <div className="team-grid">
         {list.map((t) => (
           <div key={t.name} className={`card team-card ${/roscommon/i.test(t.name) ? 'ours' : ''}`}>
-            <a className="team-name" href={href(t.name)}>{t.name} →</a>
+            <div className="team-head"><Crest name={t.name} src={crests[t.id]} size={36} /><a className="team-name" href={href(t.name)}>{t.name} →</a></div>
             <div className="muted small">
               {t.games} game{t.games === 1 ? '' : 's'}{t.vsRos ? ` · ${t.vsRos} v Roscommon` : ''} · last {new Date(t.last).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>

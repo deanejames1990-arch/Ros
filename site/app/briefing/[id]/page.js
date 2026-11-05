@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { db } from '../../../lib/db';
 import { currentAccess } from '../../../lib/session';
 import { briefingData, SECTIONS } from '../../../lib/briefing';
+import { getCrests } from '../../../lib/crests';
+import Crest from '../../Crest';
 import { pssSummary, quarterTrend } from '../../../lib/pss';
 import { targetFor } from '../../../lib/targets';
 import { KickoutSection, ShootingSection, TurnoverSection, PlayerTable, PssTable, QuarterTrend, ZoneGrid, playerHref } from '../../report/sections';
@@ -39,7 +41,7 @@ export default async function Briefing({ params, searchParams }) {
   const admin = access?.role === 'admin';
   const { data: b } = await db.from('briefings').select('*').eq('id', Number(params.id)).single();
   if (!b || (!b.published && !admin)) notFound();
-  const d = await briefingData(b.team_id, b.game_ids, access, admin);
+  const [d, crests] = await Promise.all([briefingData(b.team_id, b.game_ids, access, admin), getCrests()]);
   if (!d) notFound();
   const { team, rows, tagged, mine, opp, teamList } = d;
   const A = { name: team.name, color: TEAM };
@@ -57,7 +59,7 @@ export default async function Briefing({ params, searchParams }) {
       {searchParams.saved && <p className="card check ok small no-print">Saved.</p>}
       {admin && searchParams.edit && <Editor b={b} candidates={d.candidates} sections={SECTIONS} />}
       <div className="hero" data-export-title={`${b.title} · ${rows.length} games`}>
-        <h1>{b.title}{!b.published && <span className="muted"> · draft</span>}</h1>
+        <h1><Crest name={team.name} src={crests.byId[team.id]} size={44} className="brief-crest" />{b.title}{!b.published && <span className="muted"> · draft</span>}</h1>
         <PrintButton />
       </div>
       <SectionImages />

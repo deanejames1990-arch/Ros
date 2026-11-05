@@ -38,8 +38,9 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
   const colors = ['#3b4f9e', '#c4572a'];
   const A = { name: teams[0].name, color: colors[0] };
   const B = { name: teams[1].name, color: colors[1] };
-  const r = analyseMatch({ events: rows, teams, period });
-  const full = period === 'All' ? r : analyseMatch({ events: rows, teams });
+  const open = !match.finished; // still being tagged: count the possession after the last score
+  const r = analyseMatch({ events: rows, teams, period, open });
+  const full = period === 'All' ? r : analyseMatch({ events: rows, teams, open });
   const a = r.byTeam[teams[0].id], b = r.byTeam[teams[1].id];
   const fa = full.byTeam[teams[0].id], fb = full.byTeam[teams[1].id];
   const inPeriod = r.events;

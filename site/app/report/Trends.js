@@ -51,7 +51,7 @@ export default function Trends({ events, teams, halfLen = 35, windowMin = 10, us
             {rows.length ? (
               <div className="wrap">
                 <table className="danger" style={{ '--tc': tm.color }}>
-                  <thead><tr><th /><th>Score</th><th>Shots</th><th title={`Frees won off ${us.name}`}>Frees won</th><th title={`Turnovers won off ${us.name}`}>T/O won</th><th title={`${us.name} kick-outs won`}>{usId == null ? `${us.name.split(' ')[0]} KOs won` : 'Our KOs won'}</th><th>Last {windowMin}′</th></tr></thead>
+                  <thead><tr><th /><th>Score</th><th>Shots</th><th title={`Frees won off ${us.name}`}>Frees won</th><th title={`Turnovers won off ${us.name}`}>T/O won</th><th title="2-pointers scored / tried">2-pt</th><th title={`${tm.name} kick-outs won by this player`}>Own KOs won</th><th title={`${us.name} kick-outs won`}>{usId == null ? `${us.name.split(' ')[0]} KOs won` : 'Our KOs won'}</th><th>Last {windowMin}′</th></tr></thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.who} className={r.recent ? 'hot' : ''}>
@@ -60,6 +60,8 @@ export default function Trends({ events, teams, halfLen = 35, windowMin = 10, us
                         <td className="num">{r.shots ? `${r.scores}/${r.shots}` : '–'}</td>
                         <td className="num">{r.freesWon || '–'}</td>
                         <td className="num">{r.toWon || '–'}</td>
+                        <td className="num">{r.twoTried ? `${r.twoScored}/${r.twoTried}` : '–'}</td>
+                        <td className="num">{r.ownKo || '–'}</td>
                         <td className="num">{r.koWon || '–'}</td>
                         <td className="num">{r.recent ? <b>{r.recent}</b> : '–'}</td>
                       </tr>

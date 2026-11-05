@@ -10,6 +10,9 @@ import { PrintButton, SectionImages } from '../../report/Export';
 import { nameEvents, isNumberTag } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
 import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
+import { getCrests, CREST_SQL } from '../../../lib/crests';
+import Crest from '../../Crest';
+import CrestUpload from './CrestUpload';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +50,9 @@ export default async function TeamReport({ params, searchParams }) {
 
   // Team sheets for these games: they name tags made by number, and give the squad list.
   const role = await currentRole();
+  const isAdmin = role === 'admin';
+  const crests = await getCrests();
+  const crestSrc = teams.map((t) => crests.byId[t.id]).find(Boolean) || null;
   const { data: seasonApps } = inSeason.length
     ? await db.from('appearances').select('match_id, team_id, jersey_no, started, goals, points, player_id, players(id, name)').in('match_id', inSeason.map((m) => m.id))
     : { data: [] };
@@ -106,7 +112,10 @@ export default async function TeamReport({ params, searchParams }) {
     <>
       <p className="muted"><a href="/games">All games</a></p>
       <div className="hero" data-export-title={`${teamName}${grade ? ` ${grade}` : ''}${year ? ` ${year}` : ' all seasons'}${comp ? ` ${comp}` : ''}${nExcluded ? ` (${nExcluded} excluded)` : ''} · ${tagged.length} game${tagged.length === 1 ? '' : 's'}`}>
-        <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}{comp ? <span className="muted"> · {comp}</span> : ''}</h1>
+        <div className="team-title">
+          {isAdmin ? <CrestUpload teamId={teams[0].id} name={teamName} src={crestSrc} ready={crests.ready} sql={CREST_SQL} /> : <Crest name={teamName} src={crestSrc} size={56} />}
+          <h1>{teamName}{grade && grade !== 'Senior' ? <span className="muted"> · {grade}</span> : ''}{year ? <span className="muted"> · {year}</span> : ''}{comp ? <span className="muted"> · {comp}</span> : ''}</h1>
+        </div>
         <PrintButton />
       </div>
       <SectionImages />

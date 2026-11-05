@@ -155,7 +155,7 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
   const players = Object.fromEntries(teams.map((t) => [t.id, {}]));
   const prow = (tid, who) => {
     if (!who || !players[tid]) return null;
-    return (players[tid][who] ||= { who, pts: 0, goals: 0, scores: 0, shots: 0, freesWon: 0, toWon: 0, koWon: 0, ownKo: 0, recent: 0, recentPts: 0 });
+    return (players[tid][who] ||= { who, pts: 0, goals: 0, scores: 0, shots: 0, twoTried: 0, twoScored: 0, freesWon: 0, toWon: 0, koWon: 0, ownKo: 0, recent: 0, recentPts: 0 });
   };
   for (const e of all) {
     const recentE = at(e) >= from;
@@ -164,6 +164,7 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
       if (!r) continue;
       const v = shotValue(e);
       r.shots += 1; r.pts += v; if (v) r.scores += 1; if (v === 3) r.goals += 1;
+      if (v === 2 || lbl(e, 'Attempt') === '2 Point') { r.twoTried += 1; if (v === 2) r.twoScored += 1; }
       if (v && recentE) { r.recent += 1; r.recentPts += v; }
     } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy') && !/^(team\s*)?[ab]$/i.test(String(lbl(e, 'FreeWonBy')))) {
       const r = prow(other(e.team_id), lbl(e, 'FreeWonBy'));
@@ -186,7 +187,7 @@ export function trends({ events, teams, halfLen = 35, windowMin = 10, usId = nul
   for (const t of teams) {
     const opp = name(other(t.id));
     danger[t.id] = Object.values(players[t.id])
-      .map((r) => ({ ...r, line: sc(r.pts, r.goals), hurt: r.scores + r.freesWon + r.toWon + r.koWon }))
+      .map((r) => ({ ...r, line: sc(r.pts, r.goals), hurt: r.scores + r.freesWon + r.toWon + r.koWon + r.ownKo }))
       .filter((r) => r.hurt > 0)
       .sort((a, b) => b.hurt - a.hurt || b.pts - a.pts || b.recent - a.recent);
     for (const r of danger[t.id]) {

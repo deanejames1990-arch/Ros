@@ -611,3 +611,15 @@ button.lt-time:hover:not(:disabled){border-color:var(--line,#ccd)}
 button.lt-time:disabled{opacity:1;cursor:default}
 .lt-time.paused{color:#b26a00}
 .lt-settime{width:84px;font-size:1.1rem;font-weight:800;text-align:center;padding:6px}
+/* Team crests */
+.crest{display:inline-flex;align-items:center;justify-content:center;object-fit:contain;flex:none;vertical-align:middle}
+.crest-empty{border-radius:50%;background:var(--soft,#eef0f7);color:var(--mut);border:2px dashed var(--line,#ccd);font-weight:800;letter-spacing:.02em}
+.team-title{display:flex;align-items:center;gap:14px}
+.team-title h1{margin:0}
+.crest-edit{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crest-btn{background:none;border:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.crest-btn-label{font-size:.7rem;color:var(--mut)}
+.crest-edit .sql{white-space:pre-wrap;font-size:.75rem;max-width:520px}
+.team-card .team-head{display:flex;align-items:center;gap:10px}
+.brief-crest{margin-right:12px}
+.crest-edit .linkish{font-size:.75rem;font-weight:500;color:var(--mut)}

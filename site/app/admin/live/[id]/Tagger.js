@@ -315,8 +315,8 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
     const named = nameEvents(events.map((e) => ({ id: e.lid, ...toRow(e, teams) })), apps, teams);
     // In time order, then possessions worked out from kick-outs, turnovers, frees and shots.
     const ordered = [...named].sort((a, b) => (a.start_sec || 0) - (b.start_sec || 0));
-    return withPossessions(ordered, teams);
-  }, [events, teams, sheets]);
+    return withPossessions(ordered, teams, { open: !finished });
+  }, [events, teams, sheets, finished]);
   const possCount = (teamId) => rows.filter((r) => r.event_type === 'Poss' && r.team_id === teamId).length;
   const scores = teams.map((t) => liveScore(events, t.id));
   const counts = (kind, team) => events.filter((e) => e.kind === kind && e.team === team).length;
@@ -375,8 +375,8 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
           {teams.map((t, i) => (
             <div key={t.id} className="lt-col" style={{ '--tc': COLORS[i] }}>
               <div className="lt-colhead">{t.name}<small className="lt-poss" title="Worked out from kick-outs, turnovers, frees and shots">{possCount(t.id)} possessions</small></div>
-              <button type="button" className="lt-big" onClick={() => start('shot', t.id)}>Shot<small>{counts('shot', t.id)}</small></button>
               <button type="button" className="lt-big" onClick={() => start('ko', t.id)}>Kick-out<small>{counts('ko', t.id)}</small></button>
+              <button type="button" className="lt-big" onClick={() => start('shot', t.id)}>Shot<small>{counts('shot', t.id)}</small></button>
               <div className="lt-small">
                 <button type="button" onClick={() => start('to', t.id)}>Turnover won</button>
                 <button type="button" onClick={() => start('foul', t.id)}>Free conceded</button>

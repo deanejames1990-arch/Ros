@@ -8,7 +8,7 @@
 //   Turnover  team_id = team that LOST the ball, labels.PitchArea from their view
 //   Foul      team_id = team that conceded the foul
 
-import { withPossessions } from './live';
+import { withPossessions, isLiveCode, isFinishedCode } from './live';
 
 export const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
 export const PERIODS = ['All', '1st Half', '2nd Half', ...QUARTERS];
@@ -91,7 +91,7 @@ function elapsedMinutes(events) {
 const order = (a, b) =>
   (Number(a.start_sec ?? a.minute) || 0) - (Number(b.start_sec ?? b.minute) || 0) || (a.id || 0) - (b.id || 0);
 
-export function analyseMatch({ events: given = [], teams, match = null, period = 'All' }) {
+export function analyseMatch({ events: given = [], teams, match = null, period = 'All', open = match ? isLiveCode(match.match_code) && !isFinishedCode(match.match_code) : false }) {
   // Files without possession tags: work possessions out from the play
   // (kick-outs, turnovers, frees, shots), the same way as the live tagger.
   // Possessions saved by the live tagger (Auto) are always worked out again, so
@@ -99,7 +99,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   const base = given.filter((e) => !(e.event_type === 'Poss' && e.labels?.Auto));
   const possCalculated = base.length > 0 && !base.some((e) => e.event_type === 'Poss') && base.some((e) => e.event_type === 'Kickout' || e.event_type === 'Throw In');
   const raw = possCalculated
-    ? withPossessions([...base].sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || order(a, b)), teams)
+    ? withPossessions([...base].sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || order(a, b)), teams, { open })
     : base;
   const all = [...raw].sort(order);
   const elapsed = elapsedMinutes(all);
