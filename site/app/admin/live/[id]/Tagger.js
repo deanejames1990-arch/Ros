@@ -138,7 +138,8 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         .sort((a, b) => a.half - b.half || a.sec - b.sec);
       setEvents(evs);
       const last = evs[evs.length - 1];
-      if (last) setClock({ half: last.half, running: false, base: last.sec, since: 0, ended: Boolean(match.finished) });
+      // Opened on another device mid-game: paused at the last tag, ready to resume.
+      if (last) setClock({ half: last.half, running: false, base: last.sec, since: 0, ended: Boolean(match.finished), paused: !match.finished });
     }
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,11 +241,14 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   }, [toast]);
 
   // ---- Clock -------------------------------------------------------------------
+  const halfTime = () => { setClock({ ...clock, running: false, base: secs, paused: false }); setView('report'); };
+  const fullTime = () => { setClock({ ...clock, running: false, base: secs, ended: true, paused: false }); openFinish(); };
   const clockBtn = () => {
+    if (clock.paused) return ['Resume', () => setClock({ ...clock, running: true, since: Date.now(), paused: false })];
     if (clock.half === 0) return ['Throw-in: start 1st half', () => { setClock({ half: 1, running: true, base: 0, since: Date.now() }); askThrow(1); }];
-    if (clock.half === 1 && clock.running) return ['Half-time', () => { setClock({ ...clock, running: false, base: secs }); setView('report'); }];
+    if (clock.half === 1 && clock.running) return ['Half-time', halfTime];
     if (clock.half === 1) return ['Start 2nd half', () => { setClock({ half: 2, running: true, base: 0, since: Date.now() }); askThrow(2); }];
-    if (clock.running) return ['Full time', () => { setClock({ ...clock, running: false, base: secs, ended: true }); openFinish(); }];
+    if (clock.running) return ['Full time', fullTime];
     if (finished) return ['Finished', () => setView('report')];
     return ['Finish game', () => openFinish()];
   };
@@ -253,6 +257,14 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
     return { ...c, base: Math.max(0, now + d), since: Date.now() };
   });
   const [cbLabel, cbGo] = clockBtn();
+  // Pause for a break in the video (or a stoppage); set the time to match the video clock.
+  const pause = () => setClock({ ...clock, running: false, base: secs, paused: true });
+  const [settingTime, setSettingTime] = useState(null);
+  const applyTime = () => {
+    const m = String(settingTime || '').trim().match(/^(\d{1,2})(?:[:.](\d{1,2}))?$/);
+    if (m) setClock((c) => ({ ...c, base: Number(m[1]) * 60 + Number(m[2] || 0), since: Date.now() }));
+    setSettingTime(null);
+  };
 
   // ---- Throw-in ------------------------------------------------------------------
   // Asked when each half starts; the winner gets the first possession of the half.
@@ -327,10 +339,20 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
           <span className="lt-team" style={{ color: COLORS[1] }}>{teams[1].name}</span>
         </div>
         <div className="lt-clock">
-          <span className={`lt-time num ${clock.running ? 'run' : ''}`}>{clock.half ? `${clock.half === 1 ? '1st' : '2nd'} ${mmss(secs)}` : 'Not started'} <small>{clock.half ? quarter : ''}</small></span>
+          {settingTime != null ? (
+            <input className="lt-settime num" autoFocus inputMode="numeric" value={settingTime} placeholder="mm:ss" aria-label="Set the clock (minutes:seconds)"
+              onChange={(e) => setSettingTime(e.target.value)} onBlur={applyTime} onKeyDown={(e) => { if (e.key === 'Enter') applyTime(); if (e.key === 'Escape') setSettingTime(null); }} />
+          ) : (
+            <button type="button" className={`lt-time num ${clock.running ? 'run' : ''} ${clock.paused ? 'paused' : ''}`} disabled={!clock.half} title="Tap to set the time"
+              onClick={() => setSettingTime(mmss(secs))}>
+              {clock.half ? `${clock.half === 1 ? '1st' : '2nd'} ${mmss(secs)}` : 'Not started'} <small>{clock.half ? (clock.paused ? 'paused' : quarter) : ''}</small>
+            </button>
+          )}
           {clock.half > 0 && <><button type="button" onClick={() => nudge(-60)} aria-label="Clock back a minute">−1′</button><button type="button" onClick={() => nudge(60)} aria-label="Clock forward a minute">+1′</button></>}
+          {clock.running && <button type="button" onClick={pause}>Pause</button>}
           <button type="button" className="primary" onClick={cbGo}>{cbLabel}</button>
-          {clock.half === 2 && !clock.running && !finished && <button type="button" onClick={() => setClock({ ...clock, running: true, since: Date.now(), ended: false })}>Restart clock</button>}
+          {clock.paused && !clock.ended && <button type="button" onClick={clock.half === 1 ? halfTime : fullTime}>{clock.half === 1 ? 'Half-time' : 'Full time'}</button>}
+          {clock.half === 2 && !clock.running && !clock.paused && !finished && <button type="button" onClick={() => setClock({ ...clock, running: true, since: Date.now(), ended: false })}>Restart clock</button>}
           <span className={`lt-sync ${sync.state}`} title={sync.msg}>
             {sync.state === 'saved' ? 'Saved' : sync.state === 'saving' ? 'Saving…' : sync.state === 'offline' ? 'Not sent yet' : 'Saving soon'}
           </span>

@@ -606,3 +606,8 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .brief-part > h2 ~ h2{font-size:1.05rem;color:var(--mut);margin-top:14px}
 .lt-throw-teams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
 .lt-big.on{outline:3px solid var(--ink,#1c2340);outline-offset:2px}
+button.lt-time{background:none;border:1px dashed transparent;color:inherit}
+button.lt-time:hover:not(:disabled){border-color:var(--line,#ccd)}
+button.lt-time:disabled{opacity:1;cursor:default}
+.lt-time.paused{color:#b26a00}
+.lt-settime{width:84px;font-size:1.1rem;font-weight:800;text-align:center;padding:6px}
