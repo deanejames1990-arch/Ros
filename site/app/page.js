@@ -4,6 +4,7 @@ import { nameEvents, isNumberTag } from '../lib/players';
 import { getAliases } from '../lib/aliases';
 import { isLiveNow } from '../lib/live';
 import { currentAccess, gradeOk } from '../lib/session';
+import { winningTrends } from '../lib/winning';
 import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
@@ -69,11 +70,13 @@ export default async function Home({ searchParams }) {
   // Every other game this season (opposition scouting), for each team's numbers.
   const scouted = games.filter((m) => m.competitions?.grade === grade && m.competitions?.seasons?.year === year
     && !US.test(m.team1.name) && !US.test(m.team2.name));
+  const scoutedGames = [];
   const scoutedSides = (await Promise.all(scouted.map(async (m) => {
     const raw = await loadEvents(m.id);
     if (!raw.length) return [];
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
     const r = analyseMatch({ events: withoutNames(raw), teams });
+    scoutedGames.push({ a: r.byTeam[m.team1_id], b: r.byTeam[m.team2_id], pa: 3 * m.team1_goals + m.team1_points, pb: 3 * m.team2_goals + m.team2_points, ros: null });
     return teams.map((t, i) => ({ name: t.name, side: r.byTeam[t.id], opp: r.byTeam[teams[1 - i].id] }));
   }))).flat();
   const oppSides = {};
@@ -85,6 +88,8 @@ export default async function Home({ searchParams }) {
     const o = (oppSides[x.name] ||= { v: 0, list: [], pairs: [] });
     o.list.push(x.side); o.pairs.push({ mine: x.side, opp: x.opp });
   }
+  // What winning teams do, from every tagged game this season.
+  const win = winningTrends([...tagged.map((r) => ({ a: r.us, b: r.them, pa: r.f, pb: r.a, ros: 'a' })), ...scoutedGames]);
   const usTrend = quarterTrend(tagged.map((r) => ({ mine: r.us, opp: r.them })));
   const oppRows = Object.entries(oppSides)
     .map(([name, o]) => ({ name, s: pssSummary(o.list), v: o.v, trend: quarterTrend(o.pairs) }))
@@ -185,6 +190,8 @@ export default async function Home({ searchParams }) {
             ]}
             caption={`${grade} ${year || ''}: Roscommon's tagged games, then every opposition team from all their tagged games on the site this season (against Roscommon and scouted). Possessions are as tagged, or worked out from the play where a file has none.${targetFor(grade) ? ` Average quarter marked against ${targetText(targetFor(grade))}.` : ''}`} />
 
+          {win.rows.length > 0 && <WinningTrends win={win} grade={grade} year={year} />}
+
           <h2>Trends, game by game</h2>
           <div className="trend-grid">
             <TrendChart title="Points scored v conceded" games={chartGames}
@@ -243,6 +250,56 @@ export default async function Home({ searchParams }) {
           </div>
         </>
       )}
+    </>
+  );
+}
+
+// What winning teams do: the stats where being ahead goes with winning.
+function WinningTrends({ win, grade, year }) {
+  const top = win.rows.filter((r) => r.winPct >= 60).slice(0, 3);
+  const fmt = (r, v) => (v == null ? '—' : r.side ? `${v}% of games` : `${v}${r.unit || ''}`);
+  const better = (r) => {
+    if (r.ros == null) return null;
+    if (r.side) return r.ros >= 50;
+    if (r.winners == null) return null;
+    return r.low ? r.ros <= r.winners : r.ros >= r.winners;
+  };
+  return (
+    <>
+      <h2>What wins games</h2>
+      <div className="card win-card">
+        <p className="small muted">{grade} {year || ''}: the winner and loser compared in {win.games} tagged game{win.games === 1 ? '' : 's'} (Roscommon’s and scouted, draws left out).</p>
+        {top.length > 0 && (
+          <div className="win-calls">
+            {top.map((r) => (
+              <div key={r.key} className="win-call">
+                <b>{r.winPct}%</b>
+                <span>of the time, the team that <b>{r.short}</b> won the game <small className="muted">({r.games} games)</small></span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="wrap">
+          <table className="win-table">
+            <thead><tr><th>When a team…</th><th>…it won</th><th>Winners</th><th>Losers</th><th>Roscommon</th></tr></thead>
+            <tbody>
+              {win.rows.map((r) => {
+                const ok = better(r);
+                return (
+                  <tr key={r.key}>
+                    <td>{r.short}</td>
+                    <td className="num"><span className="win-bar"><i style={{ width: `${r.winPct}%` }} /></span> <b>{r.winPct}%</b> <small className="muted">of {r.games}</small></td>
+                    <td className="num">{r.side ? '—' : fmt(r, r.winners)}</td>
+                    <td className="num">{r.side ? '—' : fmt(r, r.losers)}</td>
+                    <td className={`num ${ok == null ? '' : ok ? 'win-ok' : 'win-no'}`}>{fmt(r, r.ros)}{ok == null ? '' : ok ? ' ✓' : ' ✗'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="small muted">“…it won” is how often the team ahead on that stat won (games level on it are left out). Winners / losers are the averages a game. Roscommon’s column is our average this season: ✓ at or better than the winners’ average, ✗ short of it. Small numbers of games swing these a lot.</p>
+      </div>
     </>
   );
 }
