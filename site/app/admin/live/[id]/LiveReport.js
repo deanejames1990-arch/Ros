@@ -45,6 +45,7 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
   const inPeriod = r.events;
   const ka = a.kickouts, kb = b.kickouts;
   const label = PERIODS.find((p) => p[0] === period)[1];
+  const throwIns = (id) => inPeriod.filter((e) => e.event_type === 'Throw In' && e.team_id === id).length;
 
   async function share() {
     setBusy('Making image…');
@@ -99,6 +100,7 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
             { label: 'Wides', a: a.shotsDetail.wides, b: b.shotsDetail.wides },
             { label: 'Short, saved or blocked', a: a.shotsDetail.savedBlocked, b: b.shotsDetail.savedBlocked },
             { label: '2-pointers', a: a.shotsDetail.twoScored, b: b.shotsDetail.twoScored, aNote: `of ${a.shotsDetail.twoTried} tried`, bNote: `of ${b.shotsDetail.twoTried} tried` },
+            ...(throwIns(teams[0].id) + throwIns(teams[1].id) > 0 ? [{ label: 'Throw-ins won', a: throwIns(teams[0].id), b: throwIns(teams[1].id) }] : []),
             { heading: 'Own kick-outs' },
             { label: 'Taken', a: ka.total, b: kb.total },
             { label: 'Won', a: ka.retained, b: kb.retained, aNote: pct(ka.retPct), bNote: pct(kb.retPct) },

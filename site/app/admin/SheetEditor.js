@@ -47,14 +47,16 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
     return () => clearTimeout(t);
   }, [entries, matchId, team.id, status.state]);
 
-  // Rows: 1–15 always, then subs, then one empty sub row.
+  // Rows: the full panel of 26 (1–15 starting, 16–26 subs), then anyone else
+  // listed (unnumbered or above 26), then one empty row for an extra.
+  const PANEL = 26;
   const byNo = new Map(entries.filter((e) => e.no).map((e) => [Number(e.no), e]));
-  const subs = entries.filter((e) => !e.no || Number(e.no) > 15).sort((a, b) => (a.no || 99) - (b.no || 99));
-  const nextSub = Math.max(15, ...entries.map((e) => Number(e.no) || 0)) + 1;
+  const extra = entries.filter((e) => !e.no || Number(e.no) > PANEL).sort((a, b) => (a.no || 99) - (b.no || 99));
+  const nextNo = Math.max(PANEL, ...entries.map((e) => Number(e.no) || 0)) + 1;
   const rows = [
-    ...Array.from({ length: 15 }, (_, i) => byNo.get(i + 1) || { no: i + 1, name: '' }),
-    ...subs,
-    { no: nextSub, name: '', blank: true },
+    ...Array.from({ length: PANEL }, (_, i) => byNo.get(i + 1) || { no: i + 1, name: '' }),
+    ...extra,
+    { no: nextNo, name: '', blank: true },
   ];
 
   const edit = (row, patch) => {
@@ -108,11 +110,11 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
       <div className="sheet-rows">
         {rows.map((r, i) => (
           <div key={`${i}-${r.no}`} className={`sheet-row ${i === 15 ? 'first-sub' : ''}`}>
-            {Number(r.no) > 15 || !r.no ? (
+            {Number(r.no) > PANEL || !r.no ? (
               <input className="sheet-no" type="number" min="1" max="40" inputMode="numeric" value={r.no || ''} aria-label="Number"
                 onChange={(e) => (r.blank ? null : edit(r, { no: Number(e.target.value) || null }))} disabled={r.blank} />
             ) : <span className="sheet-no">{r.no}</span>}
-            <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add a sub' : Number(r.no) > 15 ? 'Sub' : ''}
+            <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add another' : Number(r.no) > 15 ? 'Sub' : ''}
               onChange={(e) => edit(r, { name: e.target.value })} aria-label={`Number ${r.no} name`} />
           </div>
         ))}

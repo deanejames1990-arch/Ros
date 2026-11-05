@@ -34,13 +34,16 @@ function describe(e, teams) {
     case 'to': return `${t} turnover won${e.third ? ` · ${e.third.toLowerCase()}` : ''}${who}`;
     case 'foul': return `${t} free conceded${e.third ? ` · ${e.third.toLowerCase()}` : ''}${e.player ? ` · won by ${e.player.name || `#${e.player.no}`}` : ''}`;
     case 'card': return `${t} ${String(e.outcome).toLowerCase()} card${who}`;
+    case 'throw': return `${t} won the throw-in${who}`;
     default: return e.kind;
   }
 }
 
 function Players({ sheet, value, onPick, color }) {
   const [subs, setSubs] = useState(false);
-  const nums = subs ? Array.from({ length: 15 }, (_, i) => i + 16) : Array.from({ length: 15 }, (_, i) => i + 1);
+  // Subs page: 16–26 (the full panel of 26), plus any higher number on the sheet.
+  const extra = Object.keys(sheet).map(Number).filter((n) => n > 26).sort((a, b) => a - b);
+  const nums = subs ? [...Array.from({ length: 11 }, (_, i) => i + 16), ...extra] : Array.from({ length: 15 }, (_, i) => i + 1);
   return (
     <div className="lt-players">
       {nums.map((n) => {
@@ -114,6 +117,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   const [finished, setFinished] = useState(Boolean(match.finished));
   const [finishing, setFinishing] = useState(null); // { [teamId]: { g, p } } while the finish panel is open
   const [finishMsg, setFinishMsg] = useState('');
+  const [throwFor, setThrowFor] = useState(null); // { half, lid? } while asking who won the throw-in
 
   // Load: this device's copy if it has one, otherwise what's on the site.
   useEffect(() => {
@@ -237,9 +241,9 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
 
   // ---- Clock -------------------------------------------------------------------
   const clockBtn = () => {
-    if (clock.half === 0) return ['Throw-in: start 1st half', () => setClock({ half: 1, running: true, base: 0, since: Date.now() })];
+    if (clock.half === 0) return ['Throw-in: start 1st half', () => { setClock({ half: 1, running: true, base: 0, since: Date.now() }); askThrow(1); }];
     if (clock.half === 1 && clock.running) return ['Half-time', () => { setClock({ ...clock, running: false, base: secs }); setView('report'); }];
-    if (clock.half === 1) return ['Start 2nd half', () => setClock({ half: 2, running: true, base: 0, since: Date.now() })];
+    if (clock.half === 1) return ['Start 2nd half', () => { setClock({ half: 2, running: true, base: 0, since: Date.now() }); askThrow(2); }];
     if (clock.running) return ['Full time', () => { setClock({ ...clock, running: false, base: secs, ended: true }); openFinish(); }];
     if (finished) return ['Finished', () => setView('report')];
     return ['Finish game', () => openFinish()];
@@ -249,6 +253,20 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
     return { ...c, base: Math.max(0, now + d), since: Date.now() };
   });
   const [cbLabel, cbGo] = clockBtn();
+
+  // ---- Throw-in ------------------------------------------------------------------
+  // Asked when each half starts; the winner gets the first possession of the half.
+  const throwOf = (h) => events.find((e) => e.kind === 'throw' && e.half === h);
+  function askThrow(h) { if (!throwOf(h)) setThrowFor({ half: h }); }
+  function pickThrow(teamId) {
+    const h = throwFor.half;
+    const old = throwOf(h);
+    const ev = { ...(old || {}), lid: old?.lid || uid(), half: h, sec: 0, quarter: h === 2 ? 'Q3' : 'Q1', kind: 'throw', team: teamId };
+    commit(ev);
+    setThrowFor(null);
+    setToast(ev);
+  }
+  const missingThrow = clock.half > 0 && !throwOf(clock.half);
 
   // ---- Finishing -----------------------------------------------------------------
   function openFinish() {
@@ -344,6 +362,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
               </div>
             </div>
           ))}
+          {missingThrow && <p className="small lt-hint"><button type="button" onClick={() => setThrowFor({ half: clock.half })}>Who won the {clock.half === 2 ? '2nd-half' : ''} throw-in?</button></p>}
           {clock.half === 0 && <p className="muted small lt-hint">Start the clock at the throw-in so every tag gets its minute and quarter. You can tag before then; it counts as minute 0.</p>}
         </div>
       )}
@@ -364,7 +383,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
               <span className="num muted">{e.half === 2 ? '2H' : '1H'} {mmss(e.sec)}</span>
               <i className="sw" style={{ background: COLORS[T(e.team)] }} />
               <span className="lt-desc">{describe(e, teams)}</span>
-              {e.kind !== 'poss' && <button type="button" onClick={() => setEdit(e)}>Edit</button>}
+              {e.kind !== 'poss' && <button type="button" onClick={() => (e.kind === 'throw' ? setThrowFor({ half: e.half }) : setEdit(e))}>Edit</button>}
               <button type="button" onClick={() => remove(e.lid)} aria-label="Delete">✕</button>
             </div>
           ))}
@@ -389,6 +408,24 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         <div className="lt-toast" style={{ borderColor: COLORS[T(toast.team)] }}>
           <span>{describe(toast, teams)}</span>
           {events.some((x) => x.lid === toast.lid) && <button type="button" onClick={() => { remove(toast.lid); setToast(null); }}>Undo</button>}
+        </div>
+      )}
+
+      {throwFor && (
+        <div className="lt-sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) setThrowFor(null); }}>
+          <div className="lt-panel lt-throw" style={{ '--tc': '#2b3c81' }}>
+            <div className="lt-panel-head"><b>Who won the {throwFor.half === 2 ? '2nd-half ' : ''}throw-in?</b></div>
+            <p className="muted small">Their first possession of the half starts here.</p>
+            <div className="lt-throw-teams">
+              {teams.map((t, i) => (
+                <button key={t.id} type="button" className={`lt-big ${throwOf(throwFor.half)?.team === t.id ? 'on' : ''}`} style={{ '--tc': COLORS[i] }} onClick={() => pickThrow(t.id)}>{t.name}</button>
+              ))}
+            </div>
+            <div className="lt-panel-foot">
+              {throwOf(throwFor.half) && <button type="button" onClick={() => { remove(throwOf(throwFor.half).lid); setThrowFor(null); }}>Remove</button>}
+              <button type="button" onClick={() => setThrowFor(null)}>Skip</button>
+            </div>
+          </div>
         </div>
       )}
 

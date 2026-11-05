@@ -97,7 +97,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   // Possessions saved by the live tagger (Auto) are always worked out again, so
   // a game saved before a rule change shows the current rule straight away.
   const base = given.filter((e) => !(e.event_type === 'Poss' && e.labels?.Auto));
-  const possCalculated = base.length > 0 && !base.some((e) => e.event_type === 'Poss') && base.some((e) => e.event_type === 'Kickout');
+  const possCalculated = base.length > 0 && !base.some((e) => e.event_type === 'Poss') && base.some((e) => e.event_type === 'Kickout' || e.event_type === 'Throw In');
   const raw = possCalculated
     ? withPossessions([...base].sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || order(a, b)), teams)
     : base;

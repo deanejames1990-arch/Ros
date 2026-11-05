@@ -604,3 +604,5 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .tl-pts{font-weight:700;font-size:.8rem}
 .shooter-grids{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .brief-part > h2 ~ h2{font-size:1.05rem;color:var(--mut);margin-top:14px}
+.lt-throw-teams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.lt-big.on{outline:3px solid var(--ink,#1c2340);outline-offset:2px}

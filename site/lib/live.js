@@ -9,6 +9,7 @@
 //   Turnover   team_id = team that LOST the ball; PitchArea in their frame; WonBackBy
 //   Foul       team_id = team that conceded the free
 //   Card       team_id = player's team; outcome Yellow / Black / Red
+//   Throw In   team_id = team that won the throw-in at the start of a half
 
 export const LIVE_PREFIX = 'LIVE-';
 export const isLiveCode = (code) => String(code || '').startsWith(LIVE_PREFIX);
@@ -95,6 +96,11 @@ export function toRow(ev, teams) {
         if (ev.player.no) labels.Jersey = ev.player.no;
       }
       break;
+    case 'throw':
+      row.event_type = 'Throw In';
+      row.outcome = `${teams.find((t) => t.id === ev.team)?.name || ''} won`.trim();
+      player(ev.player);
+      break;
     case 'card':
       row.event_type = 'Card';
       row.outcome = ev.outcome;
@@ -126,6 +132,7 @@ export function fromRow(r, teams) {
     case 'Turnover': return { ...ev, team: other, kind: 'to', third: third(l.PitchArea) && { Def: 'Att', Mid: 'Mid', Att: 'Def' }[third(l.PitchArea)], player: l.WonBackBy ? { no: Number(l.Jersey) || Number(String(l.WonBackBy).replace('#', '')) || null, name: named(l.WonBackBy) } : null };
     case 'Foul': return { ...ev, kind: 'foul', third: third(l.PitchArea), player: l.FreeWonBy ? { no: Number(l.Jersey) || Number(String(l.FreeWonBy).replace('#', '')) || null, name: named(l.FreeWonBy) } : null };
     case 'Card': return { ...ev, kind: 'card', outcome: r.outcome, player };
+    case 'Throw In': return { ...ev, kind: 'throw', player };
     default:
       if (/^shot/i.test(r.event_type || '')) {
         const type = /\(F\)/.test(r.event_type) ? 'Free' : /\(45\)/.test(r.event_type) ? '45' : /\(Mark\)/.test(r.event_type) ? 'Mark' : 'Play';
@@ -159,7 +166,8 @@ export function liveScore(events, teamId) {
 //     team plays it next, that's a possession for them from the shot dropping short
 //   a team losing the ball must have had it: if that possession wasn't picked
 //     up, it's counted before the turnover
-//   start of each half -> throw-in possession for whoever plays the ball first
+//   start of each half -> throw-in possession for the team that won it (when
+//     tagged), otherwise for whoever plays the ball first
 // Rows are events-table rows (team_id, event_type, outcome, labels…). Returns the
 // rows with 'Poss' rows added just before the event that started each
 // possession; any possessions already in the list are replaced.
@@ -203,7 +211,9 @@ export function withPossessions(rows, teams) {
     if (e.event_type === 'Poss') continue; // worked out here instead
     const h = e.half || e.labels?.Half;
     if (h !== half) { half = h; current = null; loose = null; started = false; }
-    if (e.event_type === 'Kickout') {
+    if (e.event_type === 'Throw In') {
+      start(e.team_id, 'Throw Up', e);
+    } else if (e.event_type === 'Kickout') {
       // The kick-out is a possession for the kicking team. Winning it keeps
       // that same possession; losing it starts one for the other team.
       started = true; // a kick-out is never the throw-in
