@@ -132,25 +132,91 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
             ) : <span className="sheet-no">{r.no}</span>}
             <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add another' : Number(r.no) > 15 ? 'Sub' : ''}
               onChange={(e) => edit(r, { name: e.target.value })} aria-label={`Number ${r.no} name`} />
-            {showMins && !r.blank && r.name && (
-              <span className="sheet-mins">
-                {Number(r.no) > 15 || !r.no
-                  ? <input type="number" min="0" max="120" inputMode="numeric" placeholder="on" title="Came on (minute)" aria-label={`Number ${r.no} came on`} value={r.on ?? ''} onChange={(e) => edit(r, { on: e.target.value === '' ? null : Number(e.target.value) })} />
-                  : <span className="sheet-min-start">start</span>}
-                <input type="number" min="0" max="120" inputMode="numeric" placeholder="off" title="Went off (minute)" aria-label={`Number ${r.no} went off`} value={r.off ?? ''} onChange={(e) => edit(r, { off: e.target.value === '' ? null : Number(e.target.value) })} />
-                {spanOf(r) && <small className="muted" title="First and last minute this player was tagged in this game">tagged {spanOf(r)[0]}′–{spanOf(r)[1]}′</small>}
-              </span>
+            {showMins && !r.blank && r.name && (r.on != null || r.off != null) && (
+              <span className="sheet-mins">{r.on != null && <span className="sub-on">on {r.on}′</span>}{r.off != null && <span className="sub-off">off {r.off}′</span>}</span>
             )}
           </div>
         ))}
       </div>
-      {showMins && <p className="muted small">Minutes: <b>on</b> for a sub, <b>off</b> for anyone taken off (blank = played to the end). Minutes run through the game, so 10 minutes into the second half of a senior game is 45. “tagged 41′–70′” is the first and last minute they appear in the tags, as a guide.</p>}
+      {showMins && <Subs entries={entries} change={change} spanOf={spanOf} gameLen={info?.gameLen || 70} />}
       {!hideNote && <p className="muted small">Names in <span className="sheet-new-key">italics</span> haven’t played for {team.name} on the site before and will be added as new players.</p>}
       <details className="sheet-paste">
         <summary>Paste a list</summary>
         <textarea rows={6} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'1 Name\n2 Name\n…'} />
         <button type="button" onClick={applyPaste} disabled={!paste.trim()}>Fill the sheet</button>
       </details>
+    </div>
+  );
+}
+
+// Substitutions, the way they're said: "Niall Higgins on for Paddy Gavin, 52′".
+// Sets the came-on minute on one row and the went-off minute on the other.
+function Subs({ entries, change, spanOf, gameLen }) {
+  const half = gameLen / 2;
+  const [offKey, setOff] = useState('');
+  const [onKey, setOn] = useState('');
+  const [min, setMin] = useState('');
+  const [h, setH] = useState('2');
+  const key = (e) => `${e.no || ''}:${e.name}`;
+  const label = (e) => `${e.no ? `#${e.no} ` : ''}${e.name}`;
+  const when = (m) => (m > half ? `${m}′ (2nd half ${m - half}′)` : `${m}′`);
+  const named = entries.filter((e) => String(e.name || '').trim());
+  // Pair each sub with whoever went off at the same minute.
+  const used = new Set();
+  const pairs = named.filter((e) => e.on != null).sort((a, b) => a.on - b.on).map((on) => {
+    const off = named.find((o) => o !== on && o.off === on.on && !used.has(o));
+    if (off) used.add(off);
+    return { on, off, m: on.on };
+  });
+  const loneOff = named.filter((o) => o.off != null && !used.has(o));
+  const canOff = named.filter((e) => ((Number(e.no) && Number(e.no) <= 15) || e.on != null) && e.off == null);
+  const canOn = named.filter((e) => (!e.no || Number(e.no) > 15) && e.on == null);
+  const hint = (e) => { const s = spanOf(e); return s ? ` · tagged ${s[0]}′–${s[1]}′` : ''; };
+  const abs = () => { const m = Number(min); if (!min || Number.isNaN(m)) return null; return h === '2' ? Math.min(gameLen, half + m) : Math.min(half, m); };
+  const set = (list) => change(entries.map((e) => list.find((x) => x.e === e)?.next || e));
+  const add = () => {
+    const m = abs();
+    const o = named.find((e) => key(e) === offKey), n = named.find((e) => key(e) === onKey);
+    if (m == null || (!o && !n)) return;
+    set([...(o ? [{ e: o, next: { ...o, off: m } }] : []), ...(n ? [{ e: n, next: { ...n, on: m } }] : [])]);
+    setOff(''); setOn(''); setMin('');
+  };
+  const undo = (p) => set([{ e: p.on, next: { ...p.on, on: null } }, ...(p.off ? [{ e: p.off, next: { ...p.off, off: null } }] : [])]);
+  return (
+    <div className="subs-box">
+      <b>Substitutions</b>
+      {pairs.length === 0 && loneOff.length === 0 && <p className="muted small">None yet. Anyone not listed here played the whole game (if they started).</p>}
+      <ul className="subs-list">
+        {pairs.map((p) => (
+          <li key={key(p.on)}>
+            <span className="sub-on">{label(p.on)}</span> on for <span className="sub-off">{p.off ? label(p.off) : '—'}</span> · {when(p.m)}
+            <button type="button" className="linkish" onClick={() => undo(p)} aria-label="Remove this substitution">✕</button>
+          </li>
+        ))}
+        {loneOff.map((o) => (
+          <li key={key(o)}><span className="sub-off">{label(o)}</span> off, not replaced · {when(o.off)}
+            <button type="button" className="linkish" onClick={() => set([{ e: o, next: { ...o, off: null } }])} aria-label="Remove">✕</button></li>
+        ))}
+      </ul>
+      <div className="subs-add">
+        <select value={onKey} onChange={(e) => setOn(e.target.value)} aria-label="Came on">
+          <option value="">Came on…</option>
+          {canOn.map((e) => <option key={key(e)} value={key(e)}>{label(e)}{hint(e)}</option>)}
+        </select>
+        <span>for</span>
+        <select value={offKey} onChange={(e) => setOff(e.target.value)} aria-label="Went off">
+          <option value="">Went off…</option>
+          {canOff.map((e) => <option key={key(e)} value={key(e)}>{label(e)}{hint(e)}</option>)}
+        </select>
+        <span>at</span>
+        <input type="number" min="0" max={half} inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value)} placeholder="min" aria-label="Minute" />
+        <select value={h} onChange={(e) => setH(e.target.value)} aria-label="Half">
+          <option value="1">1st half</option>
+          <option value="2">2nd half</option>
+        </select>
+        <button type="button" onClick={add} disabled={!min || (!offKey && !onKey)}>Add</button>
+      </div>
+      <p className="muted small">The minute is the clock in that half (e.g. 17 in the 2nd half). Put the sub on the sheet first (16–26) so he’s in the “Came on” list. “tagged 41′–70′” is when the player first and last appears in the tags, as a guide.</p>
     </div>
   );
 }
