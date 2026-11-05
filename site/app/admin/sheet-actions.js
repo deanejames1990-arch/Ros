@@ -8,6 +8,8 @@ const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 
 // Writes a sheet's rows. Upsert on (match, player) so two saves landing at
 // the same moment (two tabs, a save and a finish) can't clash.
+const mins = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Math.max(0, Math.min(120, Math.round(Number(v)))));
+
 async function upsertApps(rows) {
   if (!rows.length) return { error: null };
   const put = (source) => db.from('appearances').upsert(rows.map((r) => ({ ...r, source })), { onConflict: 'match_id,player_id' });
@@ -34,6 +36,7 @@ export async function syncSubMinutes(matchId) {
   const { data: m } = await db.from('matches').select('id, match_code, competitions(grade)').eq('id', matchId).single();
   if (!m) return;
   const subs = (await loadEvents(matchId)).filter((e) => e.event_type === 'Sub');
+  if (!subs.length) return; // no sub tags (an imported game): the minutes typed on the sheet stand
   const { data: apps } = await db.from('appearances').select('id, team_id, jersey_no, sub_on_minute, sub_off_minute').eq('match_id', matchId);
   if (!apps?.length) return;
   const halfLen = Number(String(m.match_code || '').split('-')[2]) || (m.competitions?.grade === 'Senior' ? 35 : 30);
@@ -60,7 +63,8 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     const mid = Number(matchId), tid = Number(teamId);
     const { data: gm } = await db.from('matches').select('competitions(grade)').eq('id', mid).single();
     await requireTagger(gm?.competitions?.grade || '');
-    const list = (entries || []).map((e) => ({ no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null })).filter((e) => e.name);
+    // on / off: came-on and went-off minutes; left out (undefined) keeps what's saved.
+    const list = (entries || []).map((e) => ({ no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null, on: e.on, off: e.off })).filter((e) => e.name);
     const seen = new Set();
     for (const e of list) {
       if (e.no && seen.has(e.no)) throw new Error(`Number ${e.no} is on the sheet twice.`);
@@ -100,6 +104,9 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     // Drop anyone no longer on this sheet (and these players from the other
     // side's sheet for this game, if they were put there by mistake), then write.
     const keep = out.map((e) => e.id);
+    const { data: had } = await db.from('appearances').select('player_id, sub_on_minute, sub_off_minute').eq('match_id', mid).eq('team_id', tid);
+    const before = new Map((had || []).map((a) => [a.player_id, a]));
+    const minOr = (v, old) => (v === undefined ? old ?? null : mins(v));
     let del = db.from('appearances').delete().eq('match_id', mid).eq('team_id', tid);
     if (keep.length) del = del.not('player_id', 'in', `(${keep.join(',')})`);
     const { error: de } = await del;
@@ -110,6 +117,7 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     }
     const { error: ie } = await upsertApps(out.map((e) => ({
       match_id: mid, team_id: tid, player_id: e.id, jersey_no: e.no, started: e.no ? e.no <= 15 : false, goals: 0, points: 0,
+      sub_on_minute: minOr(e.on, before.get(e.id)?.sub_on_minute), sub_off_minute: minOr(e.off, before.get(e.id)?.sub_off_minute),
     })));
     if (ie) throw new Error(`Saving the sheet: ${ie.message}`);
     await syncAppearanceScores(mid);

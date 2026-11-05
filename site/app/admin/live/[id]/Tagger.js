@@ -427,7 +427,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         <div className="lt-sheets" hidden={view !== 'sheets'}>
           <p className="muted small lt-sheets-note">Saved to the site, so each player builds up a profile game by game. Pick names from the list so they’re spelled the same every time. Tags you made by number pick up the name from here, even ones made before you filled the sheet in.{match.hideNames && ' Names are hidden from viewers for this grade.'}</p>
           {teams.map((t, i) => (
-            <SheetEditor key={t.id} matchId={match.id} team={{ ...t, color: COLORS[i] }} info={sheetInfo[t.id]} flushRef={sheetFlush[i]}
+            <SheetEditor key={t.id} matchId={match.id} team={{ ...t, color: COLORS[i] }} info={sheetInfo[t.id]} flushRef={sheetFlush[i]} showMins={false}
               value={sheets[t.id] || []} onChange={(list) => setSheets((s) => ({ ...s, [t.id]: list }))} hideNote={i > 0} />
           ))}
         </div>

@@ -7,7 +7,7 @@ export async function sheetData(matchId, teams) {
   const out = {};
   await Promise.all(teams.map(async (t) => {
     const { data } = await db.from('appearances')
-      .select('match_id, jersey_no, player_id, players(id, name), matches(match_date)')
+      .select('match_id, jersey_no, player_id, sub_on_minute, sub_off_minute, players(id, name), matches(match_date)')
       .eq('team_id', t.id).limit(5000);
     const rows = data || [];
     const current = rows.filter((a) => a.match_id === Number(matchId));

@@ -155,5 +155,5 @@ export function scoresFromTags(events, apps, teams) {
 // [{no, name}] sorted by number, from appearances.
 export const sheetFromApps = (apps) => apps
   .filter((a) => a.players?.name)
-  .map((a) => ({ no: a.jersey_no || null, name: a.players.name, id: a.player_id ?? a.players.id ?? null }))
+  .map((a) => ({ no: a.jersey_no || null, name: a.players.name, id: a.player_id ?? a.players.id ?? null, on: a.sub_on_minute ?? null, off: a.sub_off_minute ?? null }))
   .sort((x, y) => (x.no || 99) - (y.no || 99));

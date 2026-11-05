@@ -8,7 +8,7 @@ import { parseSheet } from '../../lib/live';
 // played for the team) so a player is spelled the same way every game. Saves
 // to the site a few seconds after each change; also kept by the parent
 // (the tagger keeps a copy on the device).
-export default function SheetEditor({ matchId, team, info, value, onChange, hideNote = false, flushRef = null }) {
+export default function SheetEditor({ matchId, team, info, value, onChange, hideNote = false, flushRef = null, showMins = true }) {
   const [own, setOwn] = useState(info?.sheet || []);
   const entries = value ?? own;
   const set = onChange ?? setOwn;
@@ -101,6 +101,7 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
     const p = byName.get(n.toLowerCase());
     return { no: null, name: p ? p.name : n, id: p ? p.id : null };
   })]);
+  const spanOf = (r) => info?.tagSpan?.[String(r.name || '').trim().toLowerCase()] || (r.no ? info?.tagSpan?.[`#${r.no}`] : null) || null;
   const inSquad = (name) => !name || byName.has(String(name).trim().toLowerCase());
 
   return (
@@ -131,9 +132,19 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
             ) : <span className="sheet-no">{r.no}</span>}
             <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add another' : Number(r.no) > 15 ? 'Sub' : ''}
               onChange={(e) => edit(r, { name: e.target.value })} aria-label={`Number ${r.no} name`} />
+            {showMins && !r.blank && r.name && (
+              <span className="sheet-mins">
+                {Number(r.no) > 15 || !r.no
+                  ? <input type="number" min="0" max="120" inputMode="numeric" placeholder="on" title="Came on (minute)" aria-label={`Number ${r.no} came on`} value={r.on ?? ''} onChange={(e) => edit(r, { on: e.target.value === '' ? null : Number(e.target.value) })} />
+                  : <span className="sheet-min-start">start</span>}
+                <input type="number" min="0" max="120" inputMode="numeric" placeholder="off" title="Went off (minute)" aria-label={`Number ${r.no} went off`} value={r.off ?? ''} onChange={(e) => edit(r, { off: e.target.value === '' ? null : Number(e.target.value) })} />
+                {spanOf(r) && <small className="muted" title="First and last minute this player was tagged in this game">tagged {spanOf(r)[0]}′–{spanOf(r)[1]}′</small>}
+              </span>
+            )}
           </div>
         ))}
       </div>
+      {showMins && <p className="muted small">Minutes: <b>on</b> for a sub, <b>off</b> for anyone taken off (blank = played to the end). Minutes run through the game, so 10 minutes into the second half of a senior game is 45. “tagged 41′–70′” is the first and last minute they appear in the tags, as a guide.</p>}
       {!hideNote && <p className="muted small">Names in <span className="sheet-new-key">italics</span> haven’t played for {team.name} on the site before and will be added as new players.</p>}
       <details className="sheet-paste">
         <summary>Paste a list</summary>

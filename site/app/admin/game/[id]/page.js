@@ -34,6 +34,29 @@ export default async function EditGame({ params }) {
     for (const t of sides) {
       sheets[t.id].tagNames = (r.byTeam[t.id]?.players || []).map((p) => p.name).filter((n) => !isNumberTag(n));
     }
+    // First and last minute each player was tagged, through the game: a guide
+    // for the came-on / went-off minutes.
+    const halfLen = Number(String(g.match_code || '').match(/^LIVE-\d+-(\d+)/)?.[1]) || (g.competitions?.grade === 'Senior' ? 35 : 30);
+    const at = (e) => Math.round((String(e.half || '').startsWith('2') ? halfLen : 0) + (Number(e.minute) || 0));
+    for (const t of sides) {
+      const span = {};
+      for (const e of r.allEvents || []) {
+        const l = e.labels || {};
+        if (e.event_type === 'Poss') continue;
+        const own = e.team_id === t.id;
+        const names = [
+          ...(own ? String(l.Players || '').split(',') : []),
+          ...(!own ? [l.WonBackBy, l.FreeWonBy] : []),
+        ].map((x) => String(x || '').trim()).filter(Boolean);
+        for (const nm of names) {
+          const k = nm.toLowerCase();
+          const m = at(e);
+          span[k] = span[k] ? [Math.min(span[k][0], m), Math.max(span[k][1], m)] : [m, m];
+        }
+      }
+      sheets[t.id].tagSpan = span;
+      sheets[t.id].gameLen = 2 * halfLen;
+    }
   }
   return (
     <>
