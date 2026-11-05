@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
-import { updateGame, deleteGame, updateCompetition, mergeCompetition, renameTeam, mergeTeam } from './actions';
+import { updateGame, deleteGame, updateCompetition, mergeCompetition, renameTeam, mergeTeam, deleteTeam } from './actions';
 
 function Submit({ children, danger }) {
   const { pending } = useFormStatus();
@@ -99,6 +99,7 @@ export function CompetitionForm({ c, others, games }) {
 export function TeamForm({ t, others, games, suspect }) {
   const [rs, rename] = useFormState(renameTeam, null);
   const [ms, merge] = useFormState(mergeTeam, null);
+  const [ds, del] = useFormState(deleteTeam, null);
   return (
     <div className={`team-tool ${suspect ? 'suspect' : ''}`}>
       <div><b>{t.name}</b> <span className="muted small">{games} game{games === 1 ? '' : 's'}</span>
@@ -116,7 +117,13 @@ export function TeamForm({ t, others, games, suspect }) {
         </select>
         <button type="submit" className="danger">Merge</button>
       </form>
-      {(rs?.error || ms?.error) && <p className="check warn small">{rs?.error || ms?.error}</p>}
+      {games === 0 && (
+        <form action={del} className="inline" onSubmit={(e) => { if (!window.confirm(`Delete ${t.name}? It has no games.`)) e.preventDefault(); }}>
+          <input type="hidden" name="id" value={t.id} />
+          <button type="submit" className="danger">Delete (no games)</button>
+        </form>
+      )}
+      {(rs?.error || ms?.error || ds?.error) && <p className="check warn small">{rs?.error || ms?.error || ds?.error}</p>}
     </div>
   );
 }

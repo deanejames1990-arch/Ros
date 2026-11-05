@@ -567,7 +567,7 @@ button,input,select,textarea,svg text{font-family:var(--font)}
 .dupe-btns button{padding:6px 10px;font-size:.82rem;background:#eef1f7}
 .dupe-btns button.primary{background:var(--g);color:#fff}
 .team-tools{display:grid;gap:6px;margin-top:10px}
-.team-tool{display:grid;grid-template-columns:minmax(160px,1fr) auto auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #eef1f7}
+.team-tool{display:grid;grid-template-columns:minmax(160px,1fr) auto auto auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #eef1f7}
 .team-tool.suspect{background:#fff8ea;border-radius:8px;padding:6px 8px}
 .team-tool form.inline{display:flex;gap:6px;align-items:center}
 .team-tool input,.team-tool select{font:inherit;padding:6px 8px;border:1px solid #cfd6e4;border-radius:8px}

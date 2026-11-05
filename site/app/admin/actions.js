@@ -178,3 +178,21 @@ export async function mergeTeam(_prev, form) {
   revalidatePath('/', 'layout');
   redirect('/admin?teams=merged#teams');
 }
+
+// Removes a team with no games (e.g. a stray name from a file).
+export async function deleteTeam(_prev, form) {
+  try {
+    await requireAdmin();
+    const id = Number(form.get('id'));
+    const ids = await gamesOf(id);
+    if (ids.length) throw new Error(`This team has ${ids.length} game${ids.length === 1 ? '' : 's'}: merge it into the right team, or delete those games first.`);
+    await db.from('appearances').delete().eq('team_id', id);
+    await db.from('name_aliases').delete().eq('team_id', id);
+    const { error } = await db.from('teams').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    return { error: String(e.message || e) };
+  }
+  revalidatePath('/', 'layout');
+  redirect('/admin?teams=deleted#teams');
+}
