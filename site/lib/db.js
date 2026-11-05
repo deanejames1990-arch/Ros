@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { cleanEventNames } from './players';
 
 // Server-side only: the secret key is never sent to visitors' browsers.
 // Next.js caches fetch() on the server by default; stats must always be live,
@@ -32,6 +33,6 @@ export async function loadEvents(matchId) {
       .order('start_sec', { ascending: true }).order('id', { ascending: true }).range(from, from + 999);
     if (error) throw new Error(error.message);
     out.push(...(data || []));
-    if (!data || data.length < 1000) return out;
+    if (!data || data.length < 1000) return cleanEventNames(out);
   }
 }

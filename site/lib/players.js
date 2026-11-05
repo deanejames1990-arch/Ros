@@ -10,6 +10,32 @@ const NUM = /^(?:#|p|no\.?|n)?\s*(\d{1,2})$/i;
 export const isNumberTag = (name) => NUM.test(String(name || '').trim());
 // Imported files mark who won a free with the side letter (A / B), not a name.
 export const isSideTag = (v) => /^(team\s*)?[ab]$/i.test(String(v || '').trim());
+// Descriptors that some taggers put in the player group: "Tech Foul",
+// "Technical Foul", or on the end of a name ("Ronan Fox - Technical Foul").
+// (Deliberately leaves out words that are also first names, e.g. Mark.)
+const NOT_PLAYER = /\b(tech|technical|fouls?|fouled|card|yellow|red card|black card|discipline|dissent|kick\s?-?outs?|turnover|penalty|steps|over\s?carry|overcarry|throw\s?ball|handpass|hand pass|free kick|frees?|sideline|45s?|square ball|advantage|sin bin)\b/i;
+export const isNotPlayer = (v) => NOT_PLAYER.test(String(v || ''));
+// One tag name tidied: the descriptor taken off the end, or null if it's not a player at all.
+export function cleanTagName(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const m = s.match(/^(.+?)\s+[-–—:]\s+(.+)$/);
+  if (m && isNotPlayer(m[2]) && !isNotPlayer(m[1])) return m[1].trim();
+  return isNotPlayer(s) ? null : s;
+}
+const cleanList = (v) => String(v).split(',').map(cleanTagName).filter(Boolean).join(', ');
+// Events as loaded from the database, with non-player tags taken out of the name fields.
+export function cleanEventNames(events) {
+  return events.map((e) => {
+    const l = e.labels || {};
+    const keys = ['Players', 'WonBackBy', 'FreeWonBy'].filter((k) => l[k] && !isSideTag(l[k]));
+    const badNo = e.player_no && !isNumberTag(e.player_no) && cleanTagName(e.player_no) !== String(e.player_no).trim();
+    if (!badNo && !keys.some((k) => cleanList(l[k]) !== String(l[k]))) return e;
+    const labels = { ...l };
+    for (const k of keys) { const v = cleanList(l[k]); if (v) labels[k] = v; else delete labels[k]; }
+    return { ...e, labels, player_no: badNo ? cleanTagName(e.player_no) : e.player_no };
+  });
+}
 export const numberOf = (name) => { const m = String(name || '').trim().match(NUM); return m ? Number(m[1]) : null; };
 
 // apps: [{ team_id, jersey_no, players: { name } }]; teams: [{ id, name }]

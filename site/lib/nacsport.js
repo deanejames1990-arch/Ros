@@ -1,3 +1,4 @@
+import { cleanTagName } from './players';
 // Turns a Nacsport export (the JSON inside a .nac_to_import file) into rows for
 // the events table, in the same shape the match dashboard reads.
 //
@@ -50,7 +51,7 @@ const title = (s) =>
 // A player name: letters (and ' . -) with at least one space, not a known tag.
 const isName = (t) =>
   !KNOWN.has(t) && /^[A-ZÁÉÍÓÚ'’.\- ]+$/i.test(t) && /\s/.test(t.trim()) &&
-  !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD|KICKOUT|PASS|POSS|ATT|SCORE|MISS|TURNOVER|WINBACK|UNFORCED|OPP|OUR|SCORABLE|UNSCORABLE|PHASE|PLACED|CHANCE|ATTEMPT|PSR|OPSR|TECHNICAL|THROW|THIRD)\b/i.test(t);
+  !/\b(HALF|KO|BOX|POINT|GOAL|SHOT|FREE|CLEAN|BREAK|INSIDE|ENDS|STARTS|PERIOD|KICKOUT|PASS|POSS|ATT|SCORE|MISS|TURNOVER|WINBACK|UNFORCED|OPP|OUR|SCORABLE|UNSCORABLE|PHASE|PLACED|CHANCE|ATTEMPT|PSR|OPSR|TECHNICAL|TECH|FOULS?|DISSENT|THROW|THIRD)\b/i.test(t);
 const NOT_NAME = /^(SHOT|POINT|GOAL|WIDE|SHORT|SAVE|SAVED|BLOCK|BLOCKED|FREE|MARK|SCORE|MISS|POST|DISCIPLINE|BREACH|SIDELINE|TEAM|FOUL)$/;
 // The OUR/OPP template writes names as "J. CURRAN".
 const isInitialName = (t) => /^[A-Z]{1,2}\.\s?[A-Z][A-Z'’ -]+$/.test(t);
@@ -162,7 +163,11 @@ export function parseNacsport(json, { names = { A: 'Team A', B: 'Team B' }, file
     if (!tags.has(k)) tags.set(k, []);
     tags.get(k).push(String(d.DesTexto || '').trim().toUpperCase());
   }
-  const tagsOf = (m) => tags.get(m['Id_Medición']) || [];
+  // "RONAN FOX - TECHNICAL FOUL" -> "RONAN FOX" (the descriptor isn't part of the name).
+  const tagsOf = (m) => (tags.get(m['Id_Medición']) || []).map((x) => {
+    const c = cleanTagName(x);
+    return c && c !== String(x).trim() && isName(c) ? c : x;
+  });
 
   const cats = new Set(meds.map((m) => m.Categoria));
   const template = [...cats].some((c) => /^T[AB]\s/.test(c)) ? 'TA/TB'
