@@ -303,6 +303,20 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
     const list = String(lbl(e, 'Players') || '').split(',').map((x) => x.trim()).filter(Boolean);
     return list.length ? list : e.player_no ? [String(e.player_no)] : [];
   };
+  // Which side each name plays for in this game, from everything but kick-outs
+  // (a kick-out's name goes to the team that won it, but some taggers name the
+  // player who contested it for the other side).
+  const sideOf = new Map();
+  const mark = (n, id) => { const k = String(n).toLowerCase(); if (!sideOf.has(k)) sideOf.set(k, new Set()); sideOf.get(k).add(id); };
+  for (const e of events) {
+    if (e.event_type === 'Kickout') continue;
+    for (const n of String(lbl(e, 'WonBackBy') || '').split(',').map((x) => x.trim()).filter(Boolean)) mark(n, other(e.team_id));
+    const ns = namesOf(e);
+    if (!ns.length) continue;
+    const id = e.event_type === 'Foul' && lbl(e, 'FreeWonBy') ? other(e.team_id) : e.team_id;
+    for (const n of ns) mark(n, id);
+  }
+  const playsFor = (n, id) => { const s = sideOf.get(String(n).toLowerCase()); return !s || s.has(id); };
   for (const e of events) {
     const wonBy = String(lbl(e, 'WonBackBy') || '').split(',').map((x) => x.trim()).filter(Boolean);
     if (e.event_type === 'Turnover' && wonBy.length) {
@@ -330,7 +344,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
       for (const n of names) { const r = prow(e.team_id, n); if (r) r[e.event_type === 'Poss' ? 'poss' : 'attacks'] += 1; }
     } else if (e.event_type === 'Kickout') {
       const w = winnerOf(e.outcome, teams);
-      if (w) for (const n of names) { const r = prow(w.id, n); if (r) r.koWon += 1; }
+      if (w) for (const n of names) { if (!playsFor(n, w.id)) continue; const r = prow(w.id, n); if (r) r.koWon += 1; }
     } else if (e.event_type === 'Foul' && lbl(e, 'FreeWonBy')) {
       for (const n of names) { const r = prow(other(e.team_id), n); if (r) r.freesWon += 1; }
     } else if (e.event_type === 'Turnover') {
