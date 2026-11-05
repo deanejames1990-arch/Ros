@@ -119,8 +119,28 @@ export default async function Home({ searchParams }) {
     ] : []),
   ];
 
+  // A welcome for whoever is signed in, with the one thing most worth opening.
+  const hour = Number(new Intl.DateTimeFormat('en-IE', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Dublin' }).format(new Date()));
+  const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const first = String(access?.name || '').trim().split(/\s+/)[0] || '';
+  const { data: briefs } = await db.from('briefings').select('id, title, updated_at, published').eq('published', true).order('updated_at', { ascending: false }).limit(1);
+  const brief = (briefs || [])[0];
+  const freshBrief = brief && Date.now() - new Date(brief.updated_at).getTime() < 14 * 864e5 ? brief : null;
+  const last = [...rows].reverse()[0];
+
   return (
     <>
+      <div className="home-welcome">
+        <h2>{hello}{first ? `, ${first}` : ''}.</h2>
+        <p>
+          {live.length > 0 ? <>A game is being tagged now — <a href={`/match/${live[0].id}`}>follow it live</a>.</>
+            : freshBrief ? <>Latest briefing: <a href={`/briefing/${freshBrief.id}`}>{freshBrief.title}</a>{' · '}<a href={`/briefing/${freshBrief.id}/card`}>infographic</a>.</>
+            : last ? <>Last game: <a href={`/match/${last.m.id}`}>{last.res === 'W' ? 'won' : last.res === 'L' ? 'lost' : 'drew'} v {last.opp}, {last.line}</a> ({last.date}).</>
+            : 'Welcome to James Deane Analysis.'}
+          {role === 'tagger' && !live.length && <> Ready for match day? <a href="/admin/live">Open the live tagger</a>.</>}
+        </p>
+      </div>
+
       {live.length > 0 && (
         <div className="home-live">
           {live.map((m) => (
