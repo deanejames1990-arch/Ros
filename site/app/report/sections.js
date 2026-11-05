@@ -35,7 +35,7 @@ export function PssTable({ rows, t, caption }) {
               <th title="Scores from shots">Shot → score</th>
               <th title="Scores from possessions">Poss → score</th>
               <th>Pts a game</th>
-              {shown.some((r) => r.trend) && <th>Best quarter</th>}
+              {shown.some((r) => r.trend) && <th title="The quarter with the biggest average winning margin over the opponent in that quarter (points scored minus conceded, per game)">Best quarter<br /><small>avg margin a game</small></th>}
             </tr>
           </thead>
           <tbody>
@@ -53,7 +53,7 @@ export function PssTable({ rows, t, caption }) {
                   <td>{s.shotToScore == null ? '–' : `${s.shotToScore}%`}</td>
                   <td>{s.possToScore == null || !s.hasPoss ? '–' : `${s.possToScore}%`}</td>
                   <td>{f1(g.points)}</td>
-                  {shown.some((x) => x.trend) && <td>{r.trend ? <>{r.trend.best.q} <small className="muted">{r.trend.best.against != null ? `${r.trend.best.points - r.trend.best.against >= 0 ? '+' : '−'}${Math.abs(r.trend.best.points - r.trend.best.against).toFixed(1)}` : `${r.trend.best.points.toFixed(1)} pts`}</small></> : '–'}</td>}
+                  {shown.some((x) => x.trend) && <td>{r.trend ? <>{r.trend.best.q} <small className="muted">{r.trend.best.against != null ? `${r.trend.best.points - r.trend.best.against >= 0 ? '+' : '−'}${Math.abs(r.trend.best.points - r.trend.best.against).toFixed(1)} (${r.trend.best.points.toFixed(1)} v ${r.trend.best.against.toFixed(1)})` : `${r.trend.best.points.toFixed(1)} pts`}</small></> : '–'}</td>}
                 </tr>
               );
             })}
