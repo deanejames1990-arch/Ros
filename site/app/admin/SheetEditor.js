@@ -8,13 +8,16 @@ import { parseSheet } from '../../lib/live';
 // played for the team) so a player is spelled the same way every game. Saves
 // to the site a few seconds after each change; also kept by the parent
 // (the tagger keeps a copy on the device).
-export default function SheetEditor({ matchId, team, info, value, onChange, hideNote = false }) {
+export default function SheetEditor({ matchId, team, info, value, onChange, hideNote = false, flushRef = null }) {
   const [own, setOwn] = useState(info?.sheet || []);
   const entries = value ?? own;
   const set = onChange ?? setOwn;
   const [status, setStatus] = useState({ state: info?.sheet?.length ? 'saved' : 'idle', msg: '' });
   const [paste, setPaste] = useState('');
-  const dirty = useRef(false);
+  // A sheet on this device that the site doesn't have yet (e.g. a save that
+  // never went through) is sent as soon as the editor opens.
+  const dirty = useRef(!info?.sheet?.length && (value?.length || 0) > 0);
+  const inFlight = useRef(null);
   const setRef = useRef(set);
   setRef.current = set;
   const entriesRef = useRef(entries);
@@ -24,9 +27,11 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
 
   const change = (list) => { dirty.current = true; set(list); setStatus({ state: 'pending', msg: '' }); };
 
-  useEffect(() => {
-    if (!dirty.current) return undefined;
-    const t = setTimeout(async () => {
+  // One save at a time; used by the timer and by flush (before finishing a game).
+  const saveNow = async () => {
+    if (inFlight.current) await inFlight.current;
+    if (!dirty.current) return true;
+    const run = (async () => {
       dirty.current = false;
       setStatus({ state: 'saving', msg: '' });
       const sent = entriesRef.current;
@@ -43,8 +48,18 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
         dirty.current = true;
         setStatus({ state: 'error', msg: typeof navigator !== 'undefined' && navigator.onLine === false ? 'No signal: kept on this device, will save later' : res?.error || 'Not saved' });
       }
-    }, status.state === 'error' ? 15000 : 2000);
+      return Boolean(res?.ok);
+    })();
+    inFlight.current = run;
+    try { return await run; } finally { inFlight.current = null; }
+  };
+  if (flushRef) flushRef.current = saveNow;
+
+  useEffect(() => {
+    if (!dirty.current) return undefined;
+    const t = setTimeout(saveNow, status.state === 'error' ? 15000 : 2000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, matchId, team.id, status.state]);
 
   // Rows: the full panel of 26 (1–15 starting, 16–26 subs), then anyone else

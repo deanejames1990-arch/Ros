@@ -118,6 +118,7 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   const [finished, setFinished] = useState(Boolean(match.finished));
   const [finishing, setFinishing] = useState(null); // { [teamId]: { g, p } } while the finish panel is open
   const [finishMsg, setFinishMsg] = useState('');
+  const sheetFlush = [useRef(null), useRef(null)]; // save each team sheet now (before finishing)
   const [throwFor, setThrowFor] = useState(null); // { half, lid? } while asking who won the throw-in
 
   // Load: this device's copy if it has one, otherwise what's on the site.
@@ -294,6 +295,9 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
   async function finish() {
     setFinishMsg('Saving…');
     try {
+      // Team sheets first, so the dashboard has the names.
+      const sheetsOk = await Promise.all(sheetFlush.map((r) => (r.current ? r.current() : true)));
+      if (sheetsOk.includes(false)) throw new Error('a team sheet didn’t save: open Team sheets to see why');
       const res = await saveLiveGame(match.id, events, { final: finishing, finish: true });
       if (!res?.ok) throw new Error(res?.error || 'Save failed');
       store.set(key, { events, clock: { ...clock, running: false, ended: true }, sheets, dirty: false });
@@ -418,11 +422,12 @@ export default function Tagger({ match, teams, saved, sheetInfo = {} }) {
         <p className="center"><button type="button" onClick={openFinish}>Finish game now</button><br /><span className="muted small">For a game you’re stopping early, or if you never started the clock.</span></p>
       )}
 
-      {view === 'sheets' && (
-        <div className="lt-sheets">
+      {/* Always mounted (hidden on other tabs) so a sheet keeps saving after you leave the tab. */}
+      {(
+        <div className="lt-sheets" hidden={view !== 'sheets'}>
           <p className="muted small lt-sheets-note">Saved to the site, so each player builds up a profile game by game. Pick names from the list so they’re spelled the same every time. Tags you made by number pick up the name from here, even ones made before you filled the sheet in.{match.hideNames && ' Names are hidden from viewers for this grade.'}</p>
           {teams.map((t, i) => (
-            <SheetEditor key={t.id} matchId={match.id} team={{ ...t, color: COLORS[i] }} info={sheetInfo[t.id]}
+            <SheetEditor key={t.id} matchId={match.id} team={{ ...t, color: COLORS[i] }} info={sheetInfo[t.id]} flushRef={sheetFlush[i]}
               value={sheets[t.id] || []} onChange={(list) => setSheets((s) => ({ ...s, [t.id]: list }))} hideNote={i > 0} />
           ))}
         </div>

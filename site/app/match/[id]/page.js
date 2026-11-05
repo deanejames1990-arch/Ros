@@ -356,7 +356,7 @@ export default async function Match({ params, searchParams }) {
       {(apps || []).length > 0 && <h2>Line-outs</h2>}
       <div className="grid2">
         {[A, B].map((t) => {
-          const list = (apps || []).filter((x) => x.team_id === t.id);
+          const list = (apps || []).filter((x) => x.team_id === t.id && x.players);
           if (!list.length) return null;
           return (
             <div className="wrap" key={t.id}>

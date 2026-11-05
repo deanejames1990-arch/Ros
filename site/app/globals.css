@@ -623,3 +623,4 @@ button.lt-time:disabled{opacity:1;cursor:default}
 .team-card .team-head{display:flex;align-items:center;gap:10px}
 .brief-crest{margin-right:12px}
 .crest-edit .linkish{font-size:.75rem;font-weight:500;color:var(--mut)}
+.lt-sheets[hidden]{display:none}
