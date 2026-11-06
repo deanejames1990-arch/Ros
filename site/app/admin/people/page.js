@@ -1,4 +1,5 @@
 import { db } from '../../../lib/db';
+import { getAvatars, AVATAR_SQL } from '../../../lib/avatars';
 import People from './People';
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +19,10 @@ const SETUP_SQL = `create table if not exists site_users (
 alter table site_users enable row level security;`;
 
 export default async function PeoplePage() {
-  const [{ data: people, error }, { data: comps }] = await Promise.all([
+  const [{ data: people, error }, { data: comps }, avatars] = await Promise.all([
     db.from('site_users').select('id, name, email, role, grades, active, created_at, last_seen').order('name'),
     db.from('competitions').select('grade'),
+    getAvatars(),
   ]);
   const grades = [...new Set((comps || []).map((c) => c.grade).filter(Boolean))]
     .sort((a, b) => (['Senior', 'U20', 'Minor'].indexOf(a) + 1 || 9) - (['Senior', 'U20', 'Minor'].indexOf(b) + 1 || 9));
@@ -43,7 +45,16 @@ export default async function PeoplePage() {
       ) : error ? (
         <p className="card check warn">{error.message}</p>
       ) : (
-        <People people={people || []} grades={grades} />
+        <>
+          <People people={people || []} grades={grades} avatars={avatars.byId} />
+          {!avatars.ready && (
+            <details className="card small">
+              <summary>Set up photos (one-off)</summary>
+              <p>To add a photo for each person, run this once in Supabase (SQL Editor → New query → Run):</p>
+              <pre className="sql">{AVATAR_SQL}</pre>
+            </details>
+          )}
+        </>
       )}
     </>
   );

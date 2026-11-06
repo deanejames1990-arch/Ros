@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { addPerson, updatePerson, resetCode, setActive, removePerson, setPassword } from './actions';
+import { addPerson, updatePerson, resetCode, setActive, removePerson, setPassword, saveAvatar } from './actions';
+import Avatar from '../../Avatar';
 
 const ROLE_TEXT = { viewer: 'Viewer', tagger: 'Tagger', admin: 'Admin' };
 const when = (t) => (t ? new Date(t).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'never');
@@ -78,7 +79,47 @@ function PasswordForm({ p }) {
   );
 }
 
-function Person({ p, grades, onCode }) {
+// Shrinks a picked photo to a 160 px square (centre crop) before saving.
+async function squarePhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const side = Math.min(img.width, img.height);
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 160, 160);
+    return c.toDataURL('image/jpeg', 0.85);
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function PhotoEdit({ p, src }) {
+  const [img, setImg] = useState(src || null);
+  const [msg, setMsg] = useState('');
+  const input = useRef(null);
+  const pick = async (file) => {
+    if (!file) return;
+    setMsg('Saving…');
+    try {
+      const data = await squarePhoto(file);
+      const r = await saveAvatar(p.id, data);
+      if (!r.ok) throw new Error(r.error);
+      setImg(data); setMsg('Saved');
+    } catch (e) { setMsg(e.message || 'Couldn’t save that photo'); }
+  };
+  return (
+    <div className="photo-edit">
+      <button type="button" className="crest-btn" onClick={() => input.current?.click()} title={img ? 'Change photo' : 'Add a photo'}>
+        <Avatar name={p.name} src={img} size={64} />
+        <span className="crest-btn-label">{img ? 'Change photo' : 'Add photo'}</span>
+      </button>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pick(e.target.files?.[0])} />
+      {img && <button type="button" className="linkish small" onClick={async () => { const r = await saveAvatar(p.id, null); if (r.ok) { setImg(null); setMsg(''); } else setMsg(r.error); }}>Remove photo</button>}
+      {msg && <span className="small muted">{msg}</span>}
+    </div>
+  );
+}
+
+function Person({ p, grades, onCode, avatar }) {
   const [open, setOpen] = useState(false);
   const dlg = useRef(null);
   useEffect(() => {
@@ -96,7 +137,8 @@ function Person({ p, grades, onCode }) {
   return (
     <div className={`card person ${p.active ? '' : 'off'}`}>
       <div className="person-row">
-        <div>
+        <Avatar name={p.name} src={avatar} size={38} />
+        <div className="person-who">
           <b>{p.name}</b> {!p.active && <span className="badge-off">switched off</span>}
           <div className="muted small">{ROLE_TEXT[p.role]} · {p.grades?.length ? p.grades.join(', ') : 'all grades'} · last in {when(p.last_seen)}{p.email ? ` · ${p.email}` : ''}</div>
         </div>
@@ -107,6 +149,7 @@ function Person({ p, grades, onCode }) {
       <dialog ref={dlg} className="person-dialog" onClose={() => { setOpen(false); if (state?.ok) window.location.reload(); }} onClick={(e) => { if (e.target === dlg.current) setOpen(false); }}>
         <div className="acct-head"><b>{p.name}</b><button type="button" className="linkish" onClick={() => setOpen(false)} aria-label="Close">✕</button></div>
         <p className="muted small">Last signed in {when(p.last_seen)}{p.active ? '' : ' · switched off'}</p>
+        {open && <PhotoEdit p={p} src={avatar} />}
         <h3>Details and access</h3>
         <form action={action} className="person-form">
           <Fields grades={grades} p={p} />
@@ -133,7 +176,7 @@ function Person({ p, grades, onCode }) {
   );
 }
 
-export default function People({ people, grades }) {
+export default function People({ people, grades, avatars = {} }) {
   const [state, action] = useFormState(addPerson, null);
   const [shown, setShown] = useState(null);
   const [formKey, setFormKey] = useState(0);
@@ -156,7 +199,7 @@ export default function People({ people, grades }) {
       <h2>{people.length} {people.length === 1 ? 'person' : 'people'} <span className="muted small">· {active} with access</span></h2>
       {people.length === 0 && <p className="muted">Nobody added yet.</p>}
       <div className="people-list">
-        {people.map((p) => <Person key={p.id} p={p} grades={grades} onCode={(name, c) => setShown({ name, code: c })} />)}
+        {people.map((p) => <Person key={p.id} p={p} grades={grades} avatar={avatars[p.id]} onCode={(name, c) => setShown({ name, code: c })} />)}
       </div>
     </>
   );

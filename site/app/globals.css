@@ -778,3 +778,10 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .pw-form label.tick input{width:auto}
 .person-dialog .acct-foot button{width:auto;flex:none}
 .pw-form label.tick{justify-content:flex-start !important;display:flex !important}.pw-form label.tick input{flex:none;margin:0}
+.avatar{border-radius:50%;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
+.avatar-empty{background:var(--g);color:#fff;font-weight:800;letter-spacing:.02em}
+.acct-who{display:flex;align-items:center;gap:12px}
+.person-row{align-items:center;gap:12px}
+.person-who{flex:1;min-width:0}
+.photo-edit{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 8px}
+.photo-edit .linkish{font-size:.8rem;font-weight:500;color:var(--mut)}

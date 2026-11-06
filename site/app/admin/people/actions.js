@@ -89,3 +89,23 @@ export async function setPassword(id, _prev, form) {
     return { ok: false, error: String(e.message || e) };
   }
 }
+
+// A person's photo (a small data URL), or none to remove it.
+export async function saveAvatar(id, image) {
+  try {
+    await requireAdmin();
+    const uid = Number(id);
+    if (!image) {
+      const { error } = await db.from('user_avatars').delete().eq('user_id', uid);
+      if (error) throw new Error(error.message);
+    } else {
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(image)) throw new Error('That isn’t an image.');
+      if (image.length > 300000) throw new Error('That image is too big: try a smaller one.');
+      const { error } = await db.from('user_avatars').upsert({ user_id: uid, image, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (error) throw new Error(/relation|does not exist|schema cache/i.test(error.message) ? 'Set up photos first: run the SQL shown on this page in Supabase.' : error.message);
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}

@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getMe } from './actions';
+import Avatar from '../Avatar';
 
 const ROLE = { viewer: 'Viewer — sees the stats', tagger: 'Tagger — stats, live tagger and team sheets', admin: 'Admin — everything' };
 
 // Who you're signed in as, and sign out. Changes are made by an admin.
-export default function AccountMenu({ name, role, personal, admin }) {
+export default function AccountMenu({ name, avatar, role, personal, admin }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const dlg = useRef(null);
@@ -24,11 +25,11 @@ export default function AccountMenu({ name, role, personal, admin }) {
   return (
     <>
       <button type="button" className="nav acct-btn" onClick={() => setOpen(true)} aria-haspopup="dialog">
-        <span className="acct-avatar" aria-hidden="true">{(first || role || '?')[0].toUpperCase()}</span>{first || 'Account'}
+        <Avatar name={name || role} src={avatar} size={28} />{first || 'Account'}
       </button>
       <dialog ref={dlg} className="acct-dialog" onClose={() => setOpen(false)} onClick={(e) => { if (e.target === dlg.current) setOpen(false); }}>
         <div className="acct-head">
-          <b>{personal ? name : 'Shared sign-in'}</b>
+          <span className="acct-who"><Avatar name={name || role} src={avatar} size={52} /><b>{personal ? name : 'Shared sign-in'}</b></span>
           <button type="button" className="linkish" onClick={() => setOpen(false)} aria-label="Close">✕</button>
         </div>
         <dl className="acct-info">
