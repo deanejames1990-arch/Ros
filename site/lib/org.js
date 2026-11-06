@@ -135,14 +135,16 @@ export async function onlyOrgComps(rows, key = 'id') {
   return u ? (rows || []).filter((r) => u.comps.has(r[key])) : rows || [];
 }
 
-// Team pickers: this organisation's teams plus every county (the same for everyone),
+// Team pickers: this organisation's teams plus every county (for a county side),
 // but never another organisation's clubs.
 const COUNTY_RE = new RegExp(`^(${COUNTIES.join('|')})$`, 'i');
 export async function pickerTeams(allTeams) {
   const u = await orgUsed();
   if (!u) return allTeams || [];
+  // Clubs don't play counties: only their own teams for them.
+  const counties = (await currentOrg()).kind !== 'club';
   const seen = new Set();
-  return (allTeams || []).filter((t) => (u.teams.has(t.id) || COUNTY_RE.test(t.name)) && !seen.has(t.id) && seen.add(t.id));
+  return (allTeams || []).filter((t) => (u.teams.has(t.id) || (counties && COUNTY_RE.test(t.name))) && !seen.has(t.id) && seen.add(t.id));
 }
 
 // The same filter as a plain function, for building a query further after it:

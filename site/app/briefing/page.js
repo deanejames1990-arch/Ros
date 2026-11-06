@@ -2,7 +2,7 @@ import { db } from '../../lib/db';
 import { currentRole } from '../../lib/session';
 import { BRIEFING_SQL } from '../../lib/briefing';
 import NewBriefing from './NewBriefing';
-import { scoped, pickerTeams, currentOrg, isOurTeam } from '../../lib/org';
+import { scoped, onlyOrgTeams, currentOrg, isOurTeam } from '../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Briefings · James Deane Analysis' };
@@ -32,7 +32,7 @@ export default async function Briefings() {
         ) : <p className="card muted">No briefings yet.</p>
       ) : (
         <>
-          {admin && <NewBriefing teams={(await pickerTeams(teams)).filter((t) => !isOurTeam(org, t.name))} />}
+          {admin && <NewBriefing teams={(await onlyOrgTeams(teams)).filter((t) => !isOurTeam(org, t.name))} />}
           {shown.length === 0 && <p className="card muted">No briefings yet.</p>}
           <div className="game-strip">
             {shown.map((b) => (
