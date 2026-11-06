@@ -208,7 +208,7 @@ export function withPossessions(rows, teams, { open = false } = {}) {
       team_id: teamId, event_type: 'Poss', outcome: null, minute: e.minute, half: e.half, start_sec: e.start_sec == null ? e.start_sec : Number(e.start_sec) + at,
       player_no: null, code: 'Live', labels: { Half: e.labels?.Half || e.half, Quarter: e.labels?.Quarter, PossFrom: started ? from : 'Throw Up', Auto: true },
     });
-    current = teamId; loose = null; started = true;
+    current = teamId; loose = null; started = true; lastStart = Number(e.start_sec) || 0;
   };
   // A turnover tagged at the moment of a team's own shot (shot hits the post,
   // drops short and is gathered) is the end of that shot: put it after the shot.
@@ -222,6 +222,10 @@ export function withPossessions(rows, teams, { open = false } = {}) {
       }
     }
   }
+  // A possession that changed in the last few seconds (a tackle tagged just
+  // after the turnover it forced belongs to the old possession).
+  let lastStart = null;
+  const recentChange = (e) => lastStart != null && Math.abs((Number(e.start_sec) || 0) - lastStart) <= 3;
   for (const e of list) {
     if (e.event_type === 'Poss') continue; // worked out here instead
     const h = e.half || e.labels?.Half;
@@ -265,6 +269,14 @@ export function withPossessions(rows, teams, { open = false } = {}) {
         pending = out[out.length - 1];
       } else { loose = e.team_id; current = null; }
       continue;
+    } else if (e.event_type === 'Attack' && current !== e.team_id) {
+      // An attack means they have the ball: a possession the tags didn't start.
+      if (loose === e.team_id) current = e.team_id;
+      else start(e.team_id, loose ? 'Opp shot dropped short' : 'Other', e);
+    } else if (e.event_type === 'Tackle' && (loose === e.team_id || (current === e.team_id && !recentChange(e)))) {
+      // A tackle is made on the team with the ball: the other team had it
+      // (after this team's short / saved shot, they gathered it).
+      start(other(e.team_id), loose === e.team_id ? 'Opp shot dropped short' : 'Other', e);
     }
     out.push(e);
   }
