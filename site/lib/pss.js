@@ -46,5 +46,8 @@ export function quarterTrend(pairs) {
   const known = quarters.some((x) => x.against != null);
   const rank = (a, b) => (known ? margin(b) - margin(a) : 0) || b.points - a.points || b.scores - a.scores;
   const sorted = [...quarters].sort(rank);
-  return { quarters, best: sorted[0], worst: sorted[sorted.length - 1], games: n };
+  // Behind on average in every quarter: the best is only the closest.
+  const allBehind = known && quarters.every((x) => x.against != null && x.points < x.against);
+  const top = (k) => [...quarters].sort((a, b) => b[k] - a[k] || margin(b) - margin(a))[0];
+  return { quarters, best: sorted[0], worst: sorted[sorted.length - 1], games: n, allBehind, mostPoints: top('points'), mostWon: known ? top('won') : null };
 }

@@ -77,15 +77,23 @@ export function QuarterTrend({ name, trend, t, color = '#3b4f9e' }) {
   const max = Math.max(1, ...quarters.map((q) => Math.max(q.points, q.against || 0)));
   return (
     <div className="card q-trend">
-      <p className="q-call"><b>{name}’s best quarter is {best.q}</b>{mg(best)}: {best.points.toFixed(1)} points{best.against != null ? ` v ${best.against.toFixed(1)}` : ''} from {line(best)}{won(best)}.
-        {games > 1 && worst.q !== best.q && <> Weakest is <b>{worst.q}</b>{mg(worst)}: {worst.points.toFixed(1)} points{worst.against != null ? ` v ${worst.against.toFixed(1)}` : ''} from {line(worst)}{won(worst)}.</>}
+      <p className="q-call"><b>{trend.allBehind ? `${name} are behind in every quarter on average. Closest is ${best.q}` : `${name}’s best quarter is ${best.q}`}</b>{mg(best)}: {best.points.toFixed(1)} points{best.against != null ? ` v ${best.against.toFixed(1)}` : ''} from {line(best)}{won(best)}.
+        {games > 1 && worst.q !== best.q && <> {trend.allBehind ? 'Heaviest' : 'Weakest'} is <b>{worst.q}</b>{mg(worst)}: {worst.points.toFixed(1)} points{worst.against != null ? ` v ${worst.against.toFixed(1)}` : ''} from {line(worst)}{won(worst)}.</>}
+        {(() => {
+          // Margin isn't the whole story: where they score most, and which quarter they win most often.
+          const mp = trend.mostPoints, mw = trend.mostWon;
+          const bits = [];
+          if (mp && mp.q !== best.q) bits.push(<>most points in <b>{mp.q}</b> ({mp.points.toFixed(1)} a game)</>);
+          if (mw && mw.won > 0 && mw.won > best.won) bits.push(<>win <b>{mw.q}</b> most often ({mw.won} of {mw.vs})</>);
+          return bits.length ? <> They score {bits.length === 2 && mp.q === mw.q ? <>most and win most often in <b>{mp.q}</b> ({mp.points.toFixed(1)} a game, won {mw.won} of {mw.vs})</> : bits.map((b, i) => <span key={i}>{i ? '; ' : ''}{b}</span>)}.</> : null;
+        })()}
       </p>
       <div className="q-strip">
         {quarters.map((q) => {
           const h = t && q.poss ? hit({ poss: Math.round(q.poss * 10) / 10, shots: Math.round(q.shots * 10) / 10, scores: Math.round(q.scores * 10) / 10 }, t) : null;
           return (
             <div key={q.q} className={`q-cell ${q.q === best.q ? 'best' : ''}`}>
-              <span className="stat-k">{q.q}{q.q === best.q ? ' · best' : q.q === worst.q && games > 1 ? ' · weakest' : ''}</span>
+              <span className="stat-k">{q.q}{q.q === best.q ? (trend.allBehind ? ' · closest' : ' · best') : q.q === worst.q && games > 1 ? (trend.allBehind ? ' · heaviest' : ' · weakest') : ''}</span>
               <div className="q-bars" title={`${q.q}: ${q.points.toFixed(1)} points a game${q.against != null ? `, conceding ${q.against.toFixed(1)}` : ''}`}>
                 <i style={{ height: `${(100 * q.points) / max}%`, background: color }} />
                 {q.against != null && <i style={{ height: `${(100 * q.against) / max}%`, background: '#c4572a' }} />}

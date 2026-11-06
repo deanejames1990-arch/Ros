@@ -80,7 +80,7 @@ function Card({ m }) {
           <div className="ig-qrow">
             {m.quarters.map((q) => (
               <div key={q.q} className={`ig-q ${q.q === m.best ? 'best' : ''} ${q.q === m.worst ? 'worst' : ''}`}>
-                <div className="ig-qname">{q.q}{q.q === m.best ? ' · best' : q.q === m.worst ? ' · weakest' : ''}</div>
+                <div className="ig-qname">{q.q}{q.q === m.best ? (m.allBehind ? ' · closest' : ' · best') : q.q === m.worst ? (m.allBehind ? ' · heaviest' : ' · weakest') : ''}</div>
                 <div className="ig-qpts"><b>{q.points}</b>{q.against != null && <span> v {q.against}</span>}</div>
                 <div className="ig-qpss">{q.poss ? `${q.poss}-${q.shots}-${q.scores}` : `${q.shots} shots · ${q.scores} scores`}</div>
               </div>

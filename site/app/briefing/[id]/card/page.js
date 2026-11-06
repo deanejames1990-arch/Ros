@@ -73,7 +73,7 @@ export default async function BriefingCard({ params }) {
     } : null,
     target: t,
     quarters: trend ? trend.quarters.map((q) => ({ q: q.q, points: one(q.points), against: q.against == null ? null : one(q.against), poss: one(q.poss), shots: one(q.shots), scores: one(q.scores) })) : [],
-    best: trend?.best?.q || null, worst: trend?.worst?.q || null,
+    best: trend?.best?.q || null, worst: trend?.worst?.q || null, allBehind: Boolean(trend?.allBehind),
     ko: ko && ko.total ? {
       total: ko.total, perGame: one(ko.total / n), retPct: ko.retPct, retained: ko.retained, known: ko.total - ko.unknown,
       wonClean: ko.wonClean, wonBreak: ko.wonBreak, lostBreak: ko.lostBreak, lostClean: ko.lostClean,
