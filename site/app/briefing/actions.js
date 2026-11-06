@@ -63,6 +63,21 @@ export async function saveBriefing(id, _prev, form) {
   redirect(`/briefing/${id}?saved=1`);
 }
 
+// Just the games (ticked in the editor): saved straight away so the page and
+// the suggested key messages are worked out from them.
+export async function setBriefingGames(id, ids) {
+  try {
+    await requireAdmin();
+    await assertBriefing(id);
+    const { error } = await db.from('briefings').update({ game_ids: (ids || []).map(Number).filter(Boolean), updated_at: new Date().toISOString() }).eq('id', Number(id));
+    if (error) throw new Error(error.message);
+    revalidatePath(`/briefing/${id}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
 export async function deleteBriefing(id) {
   await requireAdmin();
   await assertBriefing(id);
