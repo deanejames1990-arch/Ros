@@ -5,6 +5,7 @@ import { unzipSync, strFromU8 } from 'fflate';
 import { parseNacsport, guessFromName, fromSportscodeXml, COUNTIES } from '../../../lib/nacsport';
 import { importGame } from './actions';
 import { isNacCsv, parseNacCsv } from '../../../lib/nac-csv';
+import { withPossessions } from '../../../lib/live';
 
 const GRADES = ['Senior', 'U20', 'Minor', 'Junior', 'Club'];
 
@@ -110,6 +111,22 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
     }
   }
 
+  // Possessions: as tagged in the file, or worked out from the play (the
+  // site's rule: a kick-out is a possession for the kicking team, won or lost).
+  const possCheck = useMemo(() => {
+    if (!parsed || parsed.error || !parsed.events.some((e) => e.event_type === 'Poss')) return null;
+    const sn = parsed.sideNames || { A: names.A || 'Team A', B: names.B || 'Team B' };
+    const teams = [{ id: 'A', name: sn.A }, { id: 'B', name: sn.B }];
+    const rows = parsed.events.map((e, i) => ({ ...e, id: i + 1, team_id: e.side }));
+    const halfOf = (e) => String(e.half || '');
+    const sorted = rows.filter((e) => e.event_type !== 'Poss')
+      .sort((a, b) => (halfOf(a) > halfOf(b) ? 1 : halfOf(a) < halfOf(b) ? -1 : 0) || (Number(a.start_sec) || 0) - (Number(b.start_sec) || 0));
+    const worked = withPossessions(sorted, teams).filter((e) => e.event_type === 'Poss');
+    const n = (list, side) => list.filter((e) => e.team_id === side).length;
+    const tags = rows.filter((e) => e.event_type === 'Poss');
+    return { names: sn, tagged: { A: n(tags, 'A'), B: n(tags, 'B') }, worked: { A: n(worked, 'A'), B: n(worked, 'B') } };
+  }, [parsed, names.A, names.B]);
+
   const tagged = parsed && !parsed.error
     ? { t1: f.aIsTeam1 ? parsed.score.A : parsed.score.B, t2: f.aIsTeam1 ? parsed.score.B : parsed.score.A }
     : null;
@@ -134,7 +151,8 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
         competition: f.compId === 'new'
           ? { name: f.newName, grade: f.newGrade, year: f.newYear || dateYear, showNames: f.newShowNames }
           : { id: f.compId },
-        events: parsed.events,
+        // Working possessions out: leave the file's possession tags behind.
+        events: possCheck && f.workPoss ? parsed.events.filter((e) => e.event_type !== 'Poss') : parsed.events,
       });
       setResult(res);
     });
@@ -256,6 +274,21 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
             )}
             {parsed.warnings.map((w) => <p key={w} className="muted small">• {w}</p>)}
           </div>
+
+          {possCheck && (
+            <div className="card">
+              <h3>Possessions</h3>
+              <p className="muted small">This file has its own possession tags. Use them, or ignore them and work possessions out from the play the site’s way (a kick-out counts as a possession for the kicking team, won or lost), as for files without possession tags.</p>
+              <label className="radio-line">
+                <input type="radio" name="possmode" checked={!f.workPoss} onChange={() => set('workPoss', false)} />
+                {' '}As tagged in the file: <b>{possCheck.names.A} {possCheck.tagged.A} · {possCheck.names.B} {possCheck.tagged.B}</b>
+              </label>
+              <label className="radio-line">
+                <input type="radio" name="possmode" checked={Boolean(f.workPoss)} onChange={() => set('workPoss', true)} />
+                {' '}Worked out by the site: <b>{possCheck.names.A} {possCheck.worked.A} · {possCheck.names.B} {possCheck.worked.B}</b>
+              </label>
+            </div>
+          )}
 
           {result && !result.ok && <p className="card check warn">Couldn’t save: {result.error}</p>}
           <button type="button" onClick={save} disabled={pending || !f.date || !f.team1 || !f.team2}>
