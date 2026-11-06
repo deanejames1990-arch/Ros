@@ -785,3 +785,8 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .person-who{flex:1;min-width:0}
 .photo-edit{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 8px}
 .photo-edit .linkish{font-size:.8rem;font-weight:500;color:var(--mut)}
+.xs-table{width:100%;margin:10px 0}
+.xs-table tr.missing td{color:var(--mut)}
+.xs-table details ul{margin:4px 0 0;padding-left:16px;text-align:left}
+.xs-actions{display:flex;gap:10px;align-items:center;margin-top:10px}
+.file-pick{display:flex;gap:10px;align-items:center;font-weight:600}
