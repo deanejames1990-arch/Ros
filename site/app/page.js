@@ -210,7 +210,7 @@ export default async function Home({ searchParams }) {
               { name: OUR, strong: true, color: ROS, href: `${ourHref}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)), trend: usTrend },
               { name: `Opposition v ${OUR}`, color: OPP, s: pssSummary(tagged.map((r) => r.them)), trend: quarterTrend(tagged.map((r) => ({ mine: r.them, opp: r.us }))) },
               ...oppRows.map((r) => ({
-                name: r.name, s: r.s, trend: r.trend, note: r.v ? `(${r.v} v Ros)` : '',
+                name: r.name, s: r.s, trend: r.trend, note: r.v ? `(${r.v} v ${OUR})` : '',
                 href: `/team/${encodeURIComponent(r.name)}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`,
               })),
             ]}
