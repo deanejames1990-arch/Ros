@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { unzipSync, strFromU8 } from 'fflate';
-import { parseNacsport, guessFromName, fromSportscodeXml } from '../../../lib/nacsport';
+import { parseNacsport, guessFromName, fromSportscodeXml, COUNTIES } from '../../../lib/nacsport';
 import { importGame } from './actions';
+import { isNacCsv, parseNacCsv } from '../../../lib/nac-csv';
 
 const GRADES = ['Senior', 'U20', 'Minor', 'Junior', 'Club'];
 
@@ -20,6 +21,8 @@ function readExport(bytes, name) {
     text = strFromU8(bytes);
   }
   text = text.replace(/^\uFEFF/, '');
+  // Nacsport CSV export: one row per action.
+  if (/\.csv$/i.test(name) || isNacCsv(text)) return { json: { csv: text }, inner: name };
   // Sportscode / Hudl XML export
   if (/^\s*</.test(text)) return { json: fromSportscodeXml(text, name), inner: name };
   return { json: JSON.parse(text), inner: name };
@@ -41,6 +44,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
   const parsed = useMemo(() => {
     if (!src) return null;
     try {
+      if (src.json.csv != null) return parseNacCsv(src.json.csv, { fileName: src.fileName });
       return parseNacsport(src.json, { names: { A: names.A || 'Team A', B: names.B || 'Team B' }, fileName: src.fileName });
     } catch (e) {
       return { error: String(e.message || e) };
@@ -54,8 +58,10 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { json } = readExport(bytes, file.name);
-      const first = parseNacsport(json, { fileName: file.name });
-      const g = guessFromName(file.name, first.video, ourTeam);
+      const csv = json.csv != null;
+      const first = csv ? parseNacCsv(json.csv, { fileName: file.name }) : parseNacsport(json, { fileName: file.name });
+      // CSV: the teams come from its Team Name column, in the file name's order.
+      const g = csv ? { ...guessFromName('', '', ourTeam), ...first.guess } : guessFromName(file.name, first.video, ourTeam);
       const team1 = matchName(teams, g.home);
       const team2 = matchName(teams, g.away);
       // In the TA/TB template TA is our team; in HOME/AWAY the first-named team is home.
@@ -83,7 +89,8 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
         code: g.code,
         compId: comp ? String(comp.id) : 'new',
         newName: g.competition,
-        newGrade: g.grade || 'Senior',
+        // Neither team a county: a club game.
+        newGrade: g.grade || (csv && ![team1, team2].some((t) => COUNTIES.some((c) => c.toLowerCase() === String(t || '').toLowerCase())) ? 'Club' : 'Senior'),
         newYear: year,
         newShowNames: true,
         ...(() => {
@@ -148,7 +155,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
   return (
     <div className="import">
       <label className="drop">
-        <input type="file" accept=".nac_to_import,.json,.zip,.xml" onChange={(e) => onFile(e.target.files?.[0])} />
+        <input type="file" accept=".nac_to_import,.json,.zip,.xml,.csv" onChange={(e) => onFile(e.target.files?.[0])} />
         <span>{src ? src.fileName : 'Choose a Nacsport file'}</span>
       </label>
       {err && <p className="card check warn">{err}</p>}
@@ -163,7 +170,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
               <label>First-named team<input list="teamnames" value={f.team1 || ''} onChange={(e) => set('team1', e.target.value)} /></label>
               <label>Second-named team<input list="teamnames" value={f.team2 || ''} onChange={(e) => set('team2', e.target.value)} /></label>
               <label>
-                {parsed.template === 'HOME/AWAY' ? 'HOME in the tags is' : parsed.template === 'OUR/OPP' ? 'OUR in the tags is' : 'TA in the tags is'}
+                {parsed.template === 'HOME/AWAY' ? 'HOME in the tags is' : parsed.template === 'OUR/OPP' ? 'OUR in the tags is' : parsed.template === 'CSV' ? 'First team in the file is' : 'TA in the tags is'}
                 <select value={f.aIsTeam1 ? '1' : '2'} onChange={(e) => set('aIsTeam1', e.target.value === '1')}>
                   <option value="1">{f.team1 || 'First-named team'}</option>
                   <option value="2">{f.team2 || 'Second-named team'}</option>
@@ -239,7 +246,7 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
           <div className="card">
             <h3>What’s in the file</h3>
             <p className="muted small">
-              {parsed.template} template · {parsed.events.length} events · {parsed.fps} fps video
+              {parsed.template === 'CSV' ? 'Nacsport CSV' : `${parsed.template} template`} · {parsed.events.length} events{parsed.template === 'CSV' ? '' : ` · ${parsed.fps} fps video`}
             </p>
             <div className="chips">
               {Object.entries(parsed.counts).map(([k, v]) => <span key={k} className="chip">{k} <b>{v}</b></span>)}
