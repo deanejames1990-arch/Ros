@@ -4,7 +4,7 @@
 // number. Tags made by number only ("#14", or a bare player_no from a file)
 // are given the name of whoever wore that number for that team that day.
 
-import { nameKey } from './names';
+import { nameKey, betterName } from './names';
 
 const lbl = (e, k) => e.labels?.[k];
 // A jersey number rather than a name: "13", "#13", "P13", "No 13", "No. 13".
@@ -65,7 +65,19 @@ function teamHelpers(teams) {
 // Swap tag names for their tidied full names, team by team.
 function applyAliases(events, byAlias, teams) {
   const { other, winnerOf } = teamHelpers(teams);
-  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${nameKey(x)}`) || x.trim()).filter((x) => x && x !== NOT_A_PLAYER).join(', ');
+  // Follow a chain of tidied names (A → B → C), stopping at a loop.
+  const look = (x, teamId) => {
+    let v = x.trim();
+    const seen = new Set(), names = [v];
+    for (let i = 0; i < 5; i += 1) {
+      const k = nameKey(v), nx = byAlias.get(`${teamId}:${k}`);
+      if (!nx) return v;
+      if (seen.has(k) || nameKey(nx) === k && names.includes(nx)) return names.reduce(betterName); // a loop: the best spelling in it
+      seen.add(k); v = nx; names.push(v);
+    }
+    return v;
+  };
+  const fix = (value, teamId) => String(value).split(',').map((x) => look(x, teamId)).filter((x) => x && x !== NOT_A_PLAYER).join(', ');
   return events.map((e) => {
     const l = e.labels || {};
     if (!l.Players && !l.WonBackBy && !l.FreeWonBy && !e.player_no) return e;
