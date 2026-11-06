@@ -4,6 +4,8 @@
 // number. Tags made by number only ("#14", or a bare player_no from a file)
 // are given the name of whoever wore that number for that team that day.
 
+import { nameKey } from './names';
+
 const lbl = (e, k) => e.labels?.[k];
 // A jersey number rather than a name: "13", "#13", "P13", "No 13", "No. 13".
 const NUM = /^(?:#|p|no\.?|n)?\s*(\d{1,2})$/i;
@@ -45,7 +47,7 @@ export const numberOf = (name) => { const m = String(name || '').trim().match(NU
 export function nameEvents(events, apps, teams, aliases = []) {
   const byNo = new Map((apps || []).filter((a) => a.jersey_no && a.players?.name).map((a) => [`${a.team_id}:${a.jersey_no}`, a.players.name]));
   const ids = new Set(teams.map((t) => t.id));
-  const byAlias = new Map((aliases || []).filter((a) => ids.has(a.team_id)).map((a) => [`${a.team_id}:${String(a.alias).trim().toLowerCase()}`, a.name]));
+  const byAlias = new Map((aliases || []).filter((a) => ids.has(a.team_id)).map((a) => [`${a.team_id}:${nameKey(a.alias)}`, a.name]));
   const named = numbersToNames(events, byNo, teams); // also writes P13 / No 13 as #13
   return byAlias.size ? applyAliases(named, byAlias, teams) : named;
 }
@@ -63,7 +65,7 @@ function teamHelpers(teams) {
 // Swap tag names for their tidied full names, team by team.
 function applyAliases(events, byAlias, teams) {
   const { other, winnerOf } = teamHelpers(teams);
-  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${x.trim().toLowerCase()}`) || x.trim()).filter((x) => x && x !== NOT_A_PLAYER).join(', ');
+  const fix = (value, teamId) => String(value).split(',').map((x) => byAlias.get(`${teamId}:${nameKey(x)}`) || x.trim()).filter((x) => x && x !== NOT_A_PLAYER).join(', ');
   return events.map((e) => {
     const l = e.labels || {};
     if (!l.Players && !l.WonBackBy && !l.FreeWonBy && !e.player_no) return e;
@@ -136,11 +138,11 @@ export function scoresFromTags(events, apps, teams) {
   const named = nameEvents(events, apps, teams);
   const out = {};
   for (const a of apps) {
-    const name = (a.players?.name || '').toLowerCase();
+    const name = nameKey(a.players?.name);
     let goals = 0, points = 0;
     for (const e of named) {
       if (e.team_id !== a.team_id || !/^shot/i.test(e.event_type || '')) continue;
-      const who = String(lbl(e, 'Players') || e.player_no || '').toLowerCase();
+      const who = nameKey(lbl(e, 'Players') || e.player_no || '');
       if (!who || (who !== name && who !== `#${a.jersey_no}`)) continue;
       const o = String(e.outcome || '').toLowerCase();
       if (o.includes('goal')) goals += 1;

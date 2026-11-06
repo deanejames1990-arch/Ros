@@ -4,6 +4,7 @@ import { db, loadEvents } from '../../lib/db';
 import { requireAdmin, requireTagger } from '../../lib/session';
 import { assertMatch, inOrg, orgMatchIds } from '../../lib/org';
 import { scoresFromTags, isStarter } from '../../lib/players';
+import { nameKey } from '../../lib/names';
 
 const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 
@@ -84,7 +85,7 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     const { data: pastAll } = await db.from('appearances').select('match_id, player_id, players(id, name)').eq('team_id', tid).limit(5000);
     const past = await inOrg(pastAll);
     const squad = new Map();
-    for (const a of past || []) if (a.players?.name) squad.set(a.players.name.toLowerCase(), a.players.id);
+    for (const a of past || []) if (a.players?.name && !squad.has(nameKey(a.players.name))) squad.set(nameKey(a.players.name), a.players.id); // fadas or not, one player
 
     const out = [];
     for (const e of list) {
@@ -93,14 +94,14 @@ export async function saveTeamSheet(matchId, teamId, entries) {
       if (id) {
         const { data: p } = await db.from('players').select('id, name').eq('id', id).maybeSingle();
         if (!p) id = null;
-        else if (p.name !== e.name) id = squad.get(e.name.toLowerCase()) || null; // name changed on the sheet
+        else if (p.name !== e.name) id = squad.get(nameKey(e.name)) || null; // name changed on the sheet
       }
-      if (!id) id = squad.get(e.name.toLowerCase()) || null;
+      if (!id) id = squad.get(nameKey(e.name)) || null;
       if (!id) {
         const { data: p, error } = await db.from('players').insert({ name: e.name }).select('id').single();
         if (error) throw new Error(`Adding ${e.name}: ${error.message}`);
         id = p.id;
-        squad.set(e.name.toLowerCase(), id);
+        squad.set(nameKey(e.name), id);
       }
       out.push({ ...e, id });
     }

@@ -9,6 +9,7 @@ import { ShotLegend, hasShotMap } from '../report/ShotMap';
 import ShotMapSet from '../report/ShotMapSet';
 import { ZoneGrid, ShotZones, splitShotZones } from '../report/sections';
 import MergePlayer from './[id]/MergePlayer';
+import { nameKey } from '../../lib/names';
 
 
 const FIELDS = ['shots', 'scores', 'points', 'goals', 'oneTried', 'oneScored', 'twoTried', 'twoScored', 'frees', 'freesScored', 'wides',
@@ -63,9 +64,9 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
     ]);
     const events = nameEvents(raw, sheet || [], teams, aliases);
     const r = analyseMatch({ events, teams });
-    const row = r.byTeam[a.team_id]?.players.find((x) => x.name.toLowerCase() === p.name.toLowerCase()) || null;
+    const row = r.byTeam[a.team_id]?.players.find((x) => nameKey(x.name) === nameKey(p.name)) || null;
     for (const e of events) {
-      if (e.team_id === a.team_id && isShot(e) && String(e.labels?.Players || '').toLowerCase() === p.name.toLowerCase()) myShots.push({ ...e, team_id: 0 });
+      if (e.team_id === a.team_id && isShot(e) && String(e.labels?.Players || '').split(',').some((n) => nameKey(n) === nameKey(p.name))) myShots.push({ ...e, team_id: 0 });
     }
     const us = m.team1_id === a.team_id;
     return {

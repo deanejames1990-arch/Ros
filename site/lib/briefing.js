@@ -4,6 +4,7 @@
 import { db, MATCH_SELECT, loadEvents } from './db';
 import { analyseMatch, combineSides, withoutNames } from './analysis';
 import { nameEvents, isNumberTag, fixStarts } from './players';
+import { nameKey, betterName } from './names';
 import { getAliases } from './aliases';
 import { gradeOk } from './session';
 import { scoped, orgScope } from './org';
@@ -76,7 +77,8 @@ export async function briefingData(teamIdIn, gameIds, access, admin) {
 function teamList(rows) {
   const players = new Map();
   const row = (name) => {
-    const k = name.toLowerCase();
+    const k = nameKey(name);
+    if (players.has(k)) players.get(k).name = betterName(players.get(k).name, name);
     if (!players.has(k)) players.set(k, { name, cells: {}, games: 0, starts: 0, points: 0, goals: 0, shots: 0, scores: 0, mins: 0, minsKnown: 0 });
     return players.get(k);
   };

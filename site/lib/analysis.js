@@ -9,6 +9,7 @@
 //   Foul      team_id = team that conceded the foul
 
 import { withPossessions, isLiveCode, isFinishedCode } from './live';
+import { nameKey, betterName } from './names';
 
 export const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
 export const PERIODS = ['All', '1st Half', '2nd Half', ...QUARTERS];
@@ -301,7 +302,9 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   const prow = (tid, name) => {
     if (!tid || !playerRows[tid] || !name) return null;
     const key = name.trim();
-    return (playerRows[tid][key.toLowerCase()] ||= {
+    const have = playerRows[tid][nameKey(key)];
+    if (have) { have.name = betterName(have.name, key); return have; }
+    return (playerRows[tid][nameKey(key)] = {
       name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0, oneTried: 0, oneScored: 0,
       frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
       tackles: 0, assists: 0, winbacks: 0, boxes: {}, boxesScored: {}, boxesFree: {}, boxesFreeScored: {}, twoTrackedGames: twoTracked ? 1 : 0,
@@ -315,7 +318,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
   // (a kick-out's name goes to the team that won it, but some taggers name the
   // player who contested it for the other side).
   const sideOf = new Map();
-  const mark = (n, id) => { const k = String(n).toLowerCase(); if (!sideOf.has(k)) sideOf.set(k, new Set()); sideOf.get(k).add(id); };
+  const mark = (n, id) => { const k = nameKey(n); if (!sideOf.has(k)) sideOf.set(k, new Set()); sideOf.get(k).add(id); };
   for (const e of events) {
     if (e.event_type === 'Kickout') continue;
     for (const n of String(lbl(e, 'WonBackBy') || '').split(',').map((x) => x.trim()).filter(Boolean)) mark(n, other(e.team_id));
@@ -324,7 +327,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
     const id = e.event_type === 'Foul' && lbl(e, 'FreeWonBy') ? other(e.team_id) : e.team_id;
     for (const n of ns) mark(n, id);
   }
-  const playsFor = (n, id) => { const s = sideOf.get(String(n).toLowerCase()); return !s || s.has(id); };
+  const playsFor = (n, id) => { const s = sideOf.get(nameKey(n)); return !s || s.has(id); };
   for (const e of events) {
     const wonBy = String(lbl(e, 'WonBackBy') || '').split(',').map((x) => x.trim()).filter(Boolean);
     if (e.event_type === 'Turnover' && wonBy.length) {
@@ -462,8 +465,9 @@ export function combineSides(list) {
     }
     for (const side of ['conceded', 'wonBack']) for (const k in out.thirds[side]) out.thirds[side][k] += s.thirds?.[side]?.[k] || 0;
     for (const pl of s.players || []) {
-      const k = pl.name.toLowerCase();
+      const k = nameKey(pl.name);
       const o = out.players[k];
+      if (o) o.name = betterName(o.name, pl.name);
       if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes }, boxesScored: { ...(pl.boxesScored || {}) }, boxesFree: { ...(pl.boxesFree || {}) }, boxesFreeScored: { ...(pl.boxesFreeScored || {}) } }; continue; }
       for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'twoTrackedGames', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;

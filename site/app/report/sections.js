@@ -4,6 +4,7 @@
 import { Versus } from '../match/[id]/charts';
 import { hit, hitRates, targetText } from '../../lib/targets';
 import { isNumberTag } from '../../lib/players';
+import { nameKey } from '../../lib/names';
 
 // "12-8-6" with each part marked against the quarter target (when there is one).
 export function Pss({ q, t, showPoss = true }) {
@@ -396,7 +397,7 @@ const COLS = [
 // A player's profile: their saved record if they're on a team sheet, otherwise
 // built from the names in the team's tags. Bare numbers ("14") have no profile.
 export function playerHref(team, name, links) {
-  const id = links?.[String(name).toLowerCase()];
+  const id = links?.[nameKey(name)];
   if (id) return `/player/${id}`;
   if (!name || isNumberTag(name)) return null;
   return `/team/${encodeURIComponent(team)}/player/${encodeURIComponent(name)}`;

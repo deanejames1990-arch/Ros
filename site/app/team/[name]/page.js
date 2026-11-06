@@ -14,6 +14,7 @@ import { getCrests, CREST_SQL } from '../../../lib/crests';
 import { scoped, orgScope } from '../../../lib/org';
 import Crest from '../../Crest';
 import CrestUpload from './CrestUpload';
+import { nameKey, betterName } from '../../../lib/names';
 
 export const dynamic = 'force-dynamic';
 
@@ -204,14 +205,17 @@ export default async function TeamReport({ params, searchParams }) {
         for (const a of seasonApps || []) {
           if (!ids.includes(a.team_id) || !doneIds.has(a.match_id) || !a.players) continue;
           if (hidden.has(a.match_id) && role !== 'admin') continue;
-          const r = sq.get(a.player_id) || { id: a.player_id, name: a.players.name, games: 0, starts: 0, goals: 0, points: 0, nos: new Set() };
+          // One row per name, fadas or not (the same player saved under two spellings).
+          const k = nameKey(a.players.name);
+          const r = sq.get(k) || { id: a.player_id, name: a.players.name, games: 0, starts: 0, goals: 0, points: 0, nos: new Set() };
+          if (betterName(r.name, a.players.name) !== r.name) { r.name = a.players.name; r.id = a.player_id; }
           r.games += 1; if (a.started) r.starts += 1; r.goals += a.goals || 0; r.points += a.points || 0; if (a.jersey_no) r.nos.add(a.jersey_no);
-          sq.set(a.player_id, r);
+          sq.set(k, r);
         }
         // Plus everyone named in the tags who isn't on a sheet yet.
-        const onSheet = new Set([...sq.values()].map((r) => r.name.toLowerCase()));
+        const onSheet = new Set([...sq.values()].map((r) => nameKey(r.name)));
         for (const pl of a.players || []) {
-          if (onSheet.has(pl.name.toLowerCase()) || isNumberTag(pl.name)) continue;
+          if (onSheet.has(nameKey(pl.name)) || isNumberTag(pl.name)) continue;
           sq.set(`tag:${pl.name}`, { id: null, name: pl.name, games: pl.games || 1, starts: null, goals: pl.goals || 0, points: (pl.points || 0) - 3 * (pl.goals || 0), nos: new Set(), fromTags: true });
         }
         const list = [...sq.values()].sort((x, y) => y.games - x.games || (3 * y.goals + y.points) - (3 * x.goals + x.points) || x.name.localeCompare(y.name));
@@ -256,7 +260,7 @@ export default async function TeamReport({ params, searchParams }) {
           <h2>{teamName} players{role === 'admin' && <a className="small no-print h2-link" href={`/admin/names?team=${encodeURIComponent(teamName)}`}>Tidy names</a>}</h2>
           <PlayerTable T={A} s={a} multi={tagged.length > 1} limit={20} links={(() => {
             const l = (seasonApps || []).filter((x) => ids.includes(x.team_id) && x.players);
-            return l.length ? Object.fromEntries(l.map((x) => [x.players.name.toLowerCase(), x.players.id])) : null;
+            return l.length ? Object.fromEntries(l.map((x) => [nameKey(x.players.name), x.players.id])) : null;
           })()} />
         </>
       )}
