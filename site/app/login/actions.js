@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { COOKIE, makeToken, roleFor, hashCode, normCode } from '../../lib/auth';
+import { COOKIE, makeToken, roleFor, hashCode, hashPassword, normCode } from '../../lib/auth';
 import { db } from '../../lib/db';
 
 // One box: a personal access code, or one of the shared passwords.
@@ -10,8 +10,10 @@ export async function login(_prev, form) {
   const typed = String(form.get('password') || '').trim();
   let role = roleFor(typed);
   let uid = 0;
-  if (!role && normCode(typed).length === 12) {
-    const { data } = await db.from('site_users').select('id, role, active').eq('code_hash', await hashCode(typed)).limit(1);
+  if (!role && typed) {
+    // A personal access code, or a password the person chose for themselves.
+    const hashes = [await hashPassword(typed), ...(normCode(typed).length === 12 ? [await hashCode(typed)] : [])];
+    const { data } = await db.from('site_users').select('id, role, active').in('code_hash', hashes).limit(1);
     const u = data?.[0];
     if (u?.active) {
       role = u.role; uid = u.id;

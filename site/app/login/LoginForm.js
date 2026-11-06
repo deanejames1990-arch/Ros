@@ -15,7 +15,7 @@ export default function LoginForm({ next }) {
       <input type="hidden" name="next" value={next} />
       <label>
         Access code or password
-        <input type="password" name="password" autoFocus autoComplete="current-password" autoCapitalize="characters" required />
+        <input type="password" name="password" autoFocus autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} required />
       </label>
       {state?.error && <p className="check warn small">{state.error}</p>}
       <Submit />

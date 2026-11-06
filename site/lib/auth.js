@@ -83,6 +83,20 @@ export async function hashCode(code) {
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
+// A password someone chose for themselves: case-sensitive, kept only as a hash
+// (in the same column as codes, so the one sign-in box finds either).
+export const PASSWORD_MIN = 8;
+export async function hashPassword(pw) {
+  const d = await crypto.subtle.digest('SHA-256', enc.encode(`ros-pass|${String(pw)}`));
+  return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+export function passwordProblem(pw) {
+  const p = String(pw || '');
+  if (p.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
+  if (/^(.)\1+$/.test(p) || /^(password|12345678|roscommon)/i.test(p)) return 'Pick something harder to guess.';
+  return null;
+}
+
 // A person's current access from the database (edge-safe: plain fetch).
 // Returns { role, grades, name } or null if removed / switched off / no table.
 export async function lookupUser(uid) {

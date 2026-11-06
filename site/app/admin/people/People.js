@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { addPerson, updatePerson, resetCode, setActive, removePerson } from './actions';
+import { addPerson, updatePerson, resetCode, setActive, removePerson, setPassword } from './actions';
 
 const ROLE_TEXT = { viewer: 'Viewer', tagger: 'Tagger', admin: 'Admin' };
 const when = (t) => (t ? new Date(t).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'never');
@@ -58,8 +58,35 @@ function CodeBox({ name, code, onClose }) {
   );
 }
 
+// Set a password for someone (e.g. one they asked for), instead of a code.
+function PasswordForm({ p }) {
+  const [state, action] = useFormState(setPassword.bind(null, p.id), null);
+  const [show, setShow] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
+  return (
+    <form ref={ref} action={action} className="pw-form">
+      <label>New password <span className="muted small">(at least 8 characters; capitals count)</span><input name="password" type={show ? 'text' : 'password'} autoComplete="new-password" minLength={8} required /></label>
+      <label>Again<input name="confirm" type={show ? 'text' : 'password'} autoComplete="new-password" minLength={8} required /></label>
+      <label className="tick"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /><span>Show what I type</span></label>
+      <div className="person-foot">
+        <Save label="Set password" />
+        {state?.ok && <span className="ok small">{state.msg}</span>}
+        {state?.error && <span className="check warn small">{state.error}</span>}
+      </div>
+    </form>
+  );
+}
+
 function Person({ p, grades, onCode }) {
   const [open, setOpen] = useState(false);
+  const dlg = useRef(null);
+  useEffect(() => {
+    const d = dlg.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
   const [state, action] = useFormState(updatePerson.bind(null, p.id), null);
   const [msg, setMsg] = useState('');
   const run = async (fn, okMsg) => {
@@ -74,22 +101,33 @@ function Person({ p, grades, onCode }) {
           <div className="muted small">{ROLE_TEXT[p.role]} · {p.grades?.length ? p.grades.join(', ') : 'all grades'} · last in {when(p.last_seen)}{p.email ? ` · ${p.email}` : ''}</div>
         </div>
         <div className="person-btns">
-          <button type="button" onClick={() => setOpen(!open)}>{open ? 'Close' : 'Edit'}</button>
-          <button type="button" onClick={async () => { const r = await resetCode(p.id); if (r.ok) onCode(p.name, r.code); else setMsg(r.error); }}>New code</button>
-          <button type="button" onClick={() => run(() => setActive(p.id, !p.active), '')}>{p.active ? 'Switch off' : 'Switch on'}</button>
+          <button type="button" onClick={() => setOpen(true)}>Edit</button>
         </div>
       </div>
-      {open && (
+      <dialog ref={dlg} className="person-dialog" onClose={() => { setOpen(false); if (state?.ok) window.location.reload(); }} onClick={(e) => { if (e.target === dlg.current) setOpen(false); }}>
+        <div className="acct-head"><b>{p.name}</b><button type="button" className="linkish" onClick={() => setOpen(false)} aria-label="Close">✕</button></div>
+        <p className="muted small">Last signed in {when(p.last_seen)}{p.active ? '' : ' · switched off'}</p>
+        <h3>Details and access</h3>
         <form action={action} className="person-form">
           <Fields grades={grades} p={p} />
           <div className="person-foot">
             <Save label="Save changes" />
-            {state?.ok && <span className="muted small">Saved</span>}
+            {state?.ok && <span className="ok small">Saved</span>}
             {state?.error && <span className="check warn small">{state.error}</span>}
-            <button type="button" className="danger" onClick={() => { if (window.confirm(`Remove ${p.name} completely?`)) run(() => removePerson(p.id), ''); }}>Remove</button>
           </div>
         </form>
-      )}
+        <h3>Sign-in</h3>
+        <p className="small muted">Give them a new random code, or set a password for them. Either way the old one stops working at once.</p>
+        <div className="person-foot">
+          <button type="button" onClick={async () => { const r = await resetCode(p.id); if (r.ok) { setOpen(false); onCode(p.name, r.code); } else setMsg(r.error); }}>New random code</button>
+        </div>
+        {open && <PasswordForm p={p} />}
+        <div className="acct-foot">
+          <button type="button" onClick={() => run(() => setActive(p.id, !p.active), '')}>{p.active ? 'Switch off access' : 'Switch access back on'}</button>
+          <button type="button" className="danger" onClick={() => { if (window.confirm(`Remove ${p.name} completely?`)) run(() => removePerson(p.id), ''); }}>Remove</button>
+        </div>
+        {state?.ok && <p className="small muted">Close this to see the change in the list.</p>}
+      </dialog>
       {msg && <p className="small">{msg}</p>}
     </div>
   );

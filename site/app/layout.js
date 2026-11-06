@@ -1,6 +1,7 @@
 import './globals.css';
 import { currentAccess } from '../lib/session';
 import { authEnabled } from '../lib/auth';
+import AccountMenu from './account/AccountMenu';
 
 export const metadata = { title: 'James Deane Analysis' };
 
@@ -20,7 +21,7 @@ export default async function RootLayout({ children }) {
               {(role === 'admin' || role === 'tagger') && <a className="nav" href="/admin/live">Live tagger</a>}
               {role === 'admin' && <a className="nav" href="/admin/import">Add game</a>}
               {role === 'admin' && <a className="nav" href="/admin">Manage</a>}
-              {authEnabled() && <a className="nav" href="/logout" title={access?.name ? `Logged in as ${access.name}` : undefined}>Log out{access?.name ? ` (${access.name.split(' ')[0]})` : ''}</a>}
+              {authEnabled() && <AccountMenu name={access?.name || ''} role={role} personal={Boolean(access?.uid)} admin={role === 'admin'} />}
             </nav>
           )}
         </header>

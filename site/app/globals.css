@@ -752,3 +752,29 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .ko-range-table{width:100%}
 .ko-range-table tr.ros td{background:#fbf6e8;font-weight:700}
 @media (max-width:700px){.ko-ranges{grid-template-columns:1fr}}
+/* Account window */
+.acct-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:0;cursor:pointer;font:inherit;color:inherit}
+.acct-avatar{width:26px;height:26px;border-radius:50%;background:var(--g);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem}
+.acct-dialog{border:0;border-radius:14px;padding:18px 20px;width:min(440px,calc(100vw - 32px));box-shadow:0 10px 40px rgba(0,0,0,.25);color:var(--ink,#1c2340);background:var(--card,#fff)}
+.acct-dialog::backdrop{background:rgba(20,28,50,.45)}
+.acct-head{display:flex;justify-content:space-between;align-items:center;font-size:1.1rem}
+.acct-dialog h3{font-size:.95rem;margin:16px 0 6px}
+.acct-form{display:grid;gap:8px}
+.acct-form label{display:grid;gap:3px;font-size:.85rem;font-weight:600}
+.acct-form input:not([type=checkbox]){width:100%;box-sizing:border-box}
+.acct-check{display:flex !important;align-items:center;gap:6px;font-weight:500 !important}
+.acct-row{display:flex;align-items:center;gap:10px}
+.acct-code{font-family:ui-monospace,monospace;font-size:1.3rem;font-weight:800;letter-spacing:.05em;background:var(--soft,#f3f5f9);padding:8px 12px;border-radius:8px;text-align:center;margin:0}
+.acct-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--line,#dde2ec)}
+.ok{color:#2e7d4f}.err{color:#b3412e}
+.acct-info{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0;font-size:.9rem}
+.acct-info dt{color:var(--mut)}.acct-info dd{margin:0;font-weight:600}
+.person-dialog{border:0;border-radius:14px;padding:18px 20px;width:min(520px,calc(100vw - 32px));box-shadow:0 10px 40px rgba(0,0,0,.25);background:var(--card,#fff);color:var(--ink,#1c2340)}
+.person-dialog::backdrop{background:rgba(20,28,50,.45)}
+.person-dialog h3{font-size:.95rem;margin:16px 0 6px}
+.pw-form{display:grid;gap:8px}
+.pw-form label{display:grid;gap:3px;font-size:.85rem;font-weight:600}
+.pw-form label.tick{display:flex;flex-direction:row;align-items:center;gap:6px;font-weight:500}
+.pw-form label.tick input{width:auto}
+.person-dialog .acct-foot button{width:auto;flex:none}
+.pw-form label.tick{justify-content:flex-start !important;display:flex !important}.pw-form label.tick input{flex:none;margin:0}

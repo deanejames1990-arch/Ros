@@ -2,7 +2,7 @@
 
 import { db } from '../../../lib/db';
 import { requireAdmin } from '../../../lib/session';
-import { newCode, hashCode, ROLES } from '../../../lib/auth';
+import { newCode, hashCode, hashPassword, passwordProblem, ROLES } from '../../../lib/auth';
 
 const clean = (s) => String(s || '').trim();
 const fields = (form) => {
@@ -69,6 +69,22 @@ export async function removePerson(id) {
     const { error } = await db.from('site_users').delete().eq('id', Number(id));
     if (error) throw new Error(error.message);
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+// Sets a password for a person (instead of a code); the old code or password stops working.
+export async function setPassword(id, _prev, form) {
+  try {
+    await requireAdmin();
+    const pw = String(form.get('password') || '');
+    if (pw !== String(form.get('confirm') || '')) throw new Error('The two passwords don’t match.');
+    const bad = passwordProblem(pw);
+    if (bad) throw new Error(bad);
+    const { error } = await db.from('site_users').update({ code_hash: await hashPassword(pw), active: true }).eq('id', Number(id));
+    if (error) throw new Error(/duplicate|unique/i.test(error.message) ? 'Someone already uses that password: pick another.' : error.message);
+    return { ok: true, msg: 'Password set. Their old code or password has stopped working.' };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };
   }
