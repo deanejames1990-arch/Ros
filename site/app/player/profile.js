@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { db, loadEvents, hiddenPlayerIds } from '../../lib/db';
 import { currentRole, currentAccess, gradeOk } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
-import { nameEvents } from '../../lib/players';
+import { nameEvents, fixStarts } from '../../lib/players';
 import { getAliases } from '../../lib/aliases';
 import { scoped, orgScope, inOrg } from '../../lib/org';
 import { ShotLegend, hasShotMap } from '../report/ShotMap';
@@ -30,10 +30,10 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
   if (hidden && !admin) notFound();
 
   const { data: allApps } = p.id
-    ? await db.from('appearances').select(`match_id, team_id, jersey_no, started, goals, points, matches(${MATCH_COLS})`).eq('player_id', p.id)
+    ? await db.from('appearances').select(`match_id, team_id, jersey_no, started, goals, points, sub_on_minute, sub_off_minute, matches(${MATCH_COLS})`).eq('player_id', p.id)
     : { data: [] };
   // Only this organisation's games.
-  const apps = await inOrg(allApps);
+  const apps = fixStarts(await inOrg(allApps));
   if (p.id && allApps?.length && !apps.length) notFound();
   const sheetGames = (apps || []).filter((a) => a.matches);
   // Other games of the same team(s): the name may be in the tags without a sheet.

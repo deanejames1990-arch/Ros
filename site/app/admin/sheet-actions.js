@@ -3,7 +3,7 @@
 import { db, loadEvents } from '../../lib/db';
 import { requireAdmin, requireTagger } from '../../lib/session';
 import { assertMatch, inOrg, orgMatchIds } from '../../lib/org';
-import { scoresFromTags } from '../../lib/players';
+import { scoresFromTags, isStarter } from '../../lib/players';
 
 const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 
@@ -66,7 +66,13 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     await requireTagger(gm?.competitions?.grade || '');
     await assertMatch(mid);
     // on / off: came-on and went-off minutes; left out (undefined) keeps what's saved.
-    const list = (entries || []).map((e) => ({ no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null, on: e.on, off: e.off })).filter((e) => e.name);
+    const list = (entries || []).map((e) => {
+      const x = { no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null, start: e.start, on: e.on, off: e.off };
+      // On at 0′ = started; off at 0′ = didn't start.
+      if (x.on === 0 || x.on === '0') { x.start = true; x.on = null; }
+      else if ((x.off === 0 || x.off === '0') && x.on == null) { x.start = false; x.off = null; }
+      return x;
+    }).filter((e) => e.name);
     const seen = new Set();
     for (const e of list) {
       if (e.no && seen.has(e.no)) throw new Error(`Number ${e.no} is on the sheet twice.`);
@@ -111,7 +117,7 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     const keep = out.map((e) => e.id);
     const { data: had } = await db.from('appearances').select('player_id, sub_on_minute, sub_off_minute').eq('match_id', mid).eq('team_id', tid);
     const before = new Map((had || []).map((a) => [a.player_id, a]));
-    const minOr = (v, old) => (v === undefined ? old ?? null : mins(v));
+    const minOr = (v, old) => (v === undefined ? (old === 0 ? null : old ?? null) : mins(v)); // 0′ is handled as started / not
     let del = db.from('appearances').delete().eq('match_id', mid).eq('team_id', tid);
     if (keep.length) del = del.not('player_id', 'in', `(${keep.join(',')})`);
     const { error: de } = await del;
@@ -121,7 +127,7 @@ export async function saveTeamSheet(matchId, teamId, entries) {
       if (oe) throw new Error(`Clearing the old sheet: ${oe.message}`);
     }
     const { error: ie } = await upsertApps(out.map((e) => ({
-      match_id: mid, team_id: tid, player_id: e.id, jersey_no: e.no, started: e.no ? e.no <= 15 : false, goals: 0, points: 0,
+      match_id: mid, team_id: tid, player_id: e.id, jersey_no: e.no, started: isStarter(e), goals: 0, points: 0,
       sub_on_minute: minOr(e.on, before.get(e.id)?.sub_on_minute), sub_off_minute: minOr(e.off, before.get(e.id)?.sub_off_minute),
     })));
     if (ie) throw new Error(`Saving the sheet: ${ie.message}`);

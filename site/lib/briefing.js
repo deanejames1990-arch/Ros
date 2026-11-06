@@ -3,7 +3,7 @@
 // notes and Nacsport Hub links per section (stored in the briefings table).
 import { db, MATCH_SELECT, loadEvents } from './db';
 import { analyseMatch, combineSides, withoutNames } from './analysis';
-import { nameEvents, isNumberTag } from './players';
+import { nameEvents, isNumberTag, fixStarts } from './players';
 import { getAliases } from './aliases';
 import { gradeOk } from './session';
 import { scoped, orgScope } from './org';
@@ -59,7 +59,7 @@ export async function briefingData(teamIdIn, gameIds, access, admin) {
       m, events: r ? r.allEvents : [], tagged: Boolean(r), mine: r?.byTeam[teamId], opp: r?.byTeam[oppId], oppId,
       oppName: us ? m.team2.name : m.team1.name, res: f > a ? 'W' : f < a ? 'L' : 'D',
       line: us ? `${m.team1_goals}-${m.team1_points} – ${m.team2_goals}-${m.team2_points}` : `${m.team2_goals}-${m.team2_points} – ${m.team1_goals}-${m.team1_points}`,
-      apps: (apps || []).filter((x) => x.match_id === m.id && x.team_id === teamId),
+      apps: fixStarts(apps).filter((x) => x.match_id === m.id && x.team_id === teamId),
     };
   }))).sort((x, y) => y.m.match_date.localeCompare(x.m.match_date));
   const tagged = rows.filter((r) => r.tagged && r.mine && r.opp);

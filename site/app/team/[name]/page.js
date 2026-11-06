@@ -7,7 +7,7 @@ import { targetFor } from '../../../lib/targets';
 import { score } from '../../components';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
 import { PrintButton, SectionImages } from '../../report/Export';
-import { nameEvents, isNumberTag } from '../../../lib/players';
+import { nameEvents, isNumberTag, fixStarts } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
 import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 import { getCrests, CREST_SQL } from '../../../lib/crests';
@@ -54,9 +54,10 @@ export default async function TeamReport({ params, searchParams }) {
   const isAdmin = role === 'admin';
   const crests = await getCrests();
   const crestSrc = teams.map((t) => crests.byId[t.id]).find(Boolean) || null;
-  const { data: seasonApps } = inSeason.length
-    ? await db.from('appearances').select('match_id, team_id, jersey_no, started, goals, points, player_id, players(id, name)').in('match_id', inSeason.map((m) => m.id))
+  const { data: seasonAppsRaw } = inSeason.length
+    ? await db.from('appearances').select('match_id, team_id, jersey_no, started, goals, points, sub_on_minute, sub_off_minute, player_id, players(id, name)').in('match_id', inSeason.map((m) => m.id))
     : { data: [] };
+  const seasonApps = fixStarts(seasonAppsRaw);
 
   // Analyse every tagged game and keep this team's side and the opposition's side.
   const aliases = await getAliases();

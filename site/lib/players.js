@@ -152,8 +152,19 @@ export function scoresFromTags(events, apps, teams) {
   return out;
 }
 
-// [{no, name}] sorted by number, from appearances.
-export const sheetFromApps = (apps) => apps
+// Who started: ticked on the sheet, else numbers 1–15. A sub "on at 0′" started,
+// and the player he "replaced at 0′" didn't (the old way of showing a starter
+// outside 1–15).
+export const isStarter = (e) => (e.start != null ? Boolean(e.start) : Boolean(Number(e.no) && Number(e.no) <= 15));
+export function fixStart(a) {
+  if (a.sub_on_minute === 0) return { ...a, started: true, sub_on_minute: null };
+  if (a.sub_off_minute === 0 && a.sub_on_minute == null) return { ...a, started: false, sub_off_minute: null };
+  return a;
+}
+export const fixStarts = (apps) => (apps || []).map(fixStart);
+
+// [{no, name, start, on, off}] sorted by number, from appearances.
+export const sheetFromApps = (apps) => fixStarts(apps)
   .filter((a) => a.players?.name)
-  .map((a) => ({ no: a.jersey_no || null, name: a.players.name, id: a.player_id ?? a.players.id ?? null, on: a.sub_on_minute ?? null, off: a.sub_off_minute ?? null }))
+  .map((a) => ({ no: a.jersey_no || null, name: a.players.name, id: a.player_id ?? a.players.id ?? null, start: a.started ?? null, on: a.sub_on_minute ?? null, off: a.sub_off_minute ?? null }))
   .sort((x, y) => (x.no || 99) - (y.no || 99));

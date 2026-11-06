@@ -10,7 +10,7 @@ import ShotMapSet from '../../report/ShotMapSet';
 import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
-import { nameEvents } from '../../../lib/players';
+import { nameEvents, fixStarts } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
 import { currentOrg, isOurTeam, matchVisible } from '../../../lib/org';
 import { targetFor, targetText, hit } from '../../../lib/targets';
@@ -33,11 +33,12 @@ export default async function Match({ params, searchParams }) {
   const view = searchParams.view === 'analyst' ? 'analyst' : 'coach';
   const period = PERIODS.includes(searchParams.period) ? searchParams.period : 'All';
 
-  const [{ data: apps }, rawEvents] = await Promise.all([
+  const [{ data: appsRaw }, rawEvents] = await Promise.all([
     db.from('appearances').select('team_id, jersey_no, started, goals, points, sub_on_minute, sub_off_minute, players(id,name)')
       .eq('match_id', m.id).order('jersey_no'),
     loadEvents(m.id),
   ]);
+  const apps = fixStarts(appsRaw);
 
   const aliases = await getAliases();
   const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];

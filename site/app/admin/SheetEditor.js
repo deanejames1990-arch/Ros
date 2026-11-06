@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { saveTeamSheet } from './sheet-actions';
 import { parseSheet } from '../../lib/live';
+import { isStarter } from '../../lib/players';
 
 // One team's sheet for one game. Names come from the squad (everyone who has
 // played for the team) so a player is spelled the same way every game. Saves
@@ -62,9 +63,9 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, matchId, team.id, status.state]);
 
-  // Rows: the full panel of 26 (1–15 starting, 16–26 subs), then anyone else
-  // listed (unnumbered or above 26), then one empty row for an extra.
-  const PANEL = 26;
+  // Rows: the full panel of 30, then anyone else listed (unnumbered or above
+  // 30), then one empty row for an extra. Who started is ticked (1–15 unless changed).
+  const PANEL = 30;
   const byNo = new Map(entries.filter((e) => e.no).map((e) => [Number(e.no), e]));
   const extra = entries.filter((e) => !e.no || Number(e.no) > PANEL).sort((a, b) => (a.no || 99) - (b.no || 99));
   const nextNo = Math.max(PANEL, ...entries.map((e) => Number(e.no) || 0)) + 1;
@@ -102,6 +103,9 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
     return { no: null, name: p ? p.name : n, id: p ? p.id : null };
   })]);
   const spanOf = (r) => info?.tagSpan?.[String(r.name || '').trim().toLowerCase()] || (r.no ? info?.tagSpan?.[`#${r.no}`] : null) || null;
+  const starters = entries.filter((e) => String(e.name || '').trim() && isStarter(e)).length;
+  // The usual sheet: 1–15 started, the rest didn't.
+  const defaultXV = entries.every((e) => e.start == null || Boolean(e.start) === Boolean(Number(e.no) && Number(e.no) <= 15));
   const inSquad = (name) => !name || byName.has(String(name).trim().toLowerCase());
 
   return (
@@ -122,16 +126,24 @@ export default function SheetEditor({ matchId, team, info, value, onChange, hide
         )}
         {entries.length > 0 && <button type="button" onClick={() => change([])}>Clear</button>}
       </div>
+      {entries.length > 0 && (
+        <p className={`small ${starters === 15 ? 'muted' : 'lt-warn'}`}>{starters} starting{starters !== 15 ? ' (usually 15)' : ''}. Tap <b>Start</b> / <b>Sub</b> beside a name when the team that started isn’t 1–15.</p>
+      )}
       <datalist id={`squad-${team.id}`}>{squad.map((p) => <option key={p.id} value={p.name}>{p.no ? `#${p.no} last time · ` : ''}{p.games} game{p.games === 1 ? '' : 's'}</option>)}</datalist>
       <div className="sheet-rows">
         {rows.map((r, i) => (
-          <div key={`${i}-${r.no}`} className={`sheet-row ${i === 15 ? 'first-sub' : ''}`}>
+          <div key={`${i}-${r.no}`} className={`sheet-row ${i === 15 && defaultXV ? 'first-sub' : ''}`}>
             {Number(r.no) > PANEL || !r.no ? (
-              <input className="sheet-no" type="number" min="1" max="40" inputMode="numeric" value={r.no || ''} aria-label="Number"
+              <input className="sheet-no" type="number" min="1" max="60" inputMode="numeric" value={r.no || ''} aria-label="Number"
                 onChange={(e) => (r.blank ? null : edit(r, { no: Number(e.target.value) || null }))} disabled={r.blank} />
             ) : <span className="sheet-no">{r.no}</span>}
-            <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add another' : Number(r.no) > 15 ? 'Sub' : ''}
+            <input className={`sheet-name ${inSquad(r.name) ? '' : 'new'}`} list={`squad-${team.id}`} value={r.name} placeholder={r.blank ? 'Add another' : isStarter(r) ? '' : 'Sub'}
               onChange={(e) => edit(r, { name: e.target.value })} aria-label={`Number ${r.no} name`} />
+            {!r.blank && r.name ? (
+              <button type="button" className={`sheet-start ${isStarter(r) ? 'on' : ''}`} aria-pressed={isStarter(r)}
+                title={isStarter(r) ? 'Started (tap if he came off the bench)' : 'Sub (tap if he started)'}
+                onClick={() => edit(r, { start: !isStarter(r) })}>{isStarter(r) ? 'Start' : 'Sub'}</button>
+            ) : <span />}
             {showMins && !r.blank && r.name && (r.on != null || r.off != null) && (
               <span className="sheet-mins">{r.on != null && <span className="sub-on">on {r.on}′</span>}{r.off != null && <span className="sub-off">off {r.off}′</span>}</span>
             )}
@@ -169,8 +181,8 @@ function Subs({ entries, change, spanOf, gameLen }) {
     return { on, off, m: on.on };
   });
   const loneOff = named.filter((o) => o.off != null && !used.has(o));
-  const canOff = named.filter((e) => ((Number(e.no) && Number(e.no) <= 15) || e.on != null) && e.off == null);
-  const canOn = named.filter((e) => (!e.no || Number(e.no) > 15) && e.on == null);
+  const canOff = named.filter((e) => (isStarter(e) || e.on != null) && e.off == null);
+  const canOn = named.filter((e) => !isStarter(e) && e.on == null);
   const hint = (e) => { const s = spanOf(e); return s ? ` · tagged ${s[0]}′–${s[1]}′` : ''; };
   const abs = () => { const m = Number(min); if (!min || Number.isNaN(m)) return null; return h === '2' ? Math.min(gameLen, half + m) : Math.min(half, m); };
   const set = (list) => change(entries.map((e) => list.find((x) => x.e === e)?.next || e));
@@ -216,7 +228,7 @@ function Subs({ entries, change, spanOf, gameLen }) {
         </select>
         <button type="button" onClick={add} disabled={!min || (!offKey && !onKey)}>Add</button>
       </div>
-      <p className="muted small">The minute is the clock in that half (e.g. 17 in the 2nd half). Put the sub on the sheet first (16–26) so he’s in the “Came on” list. “tagged 41′–70′” is when the player first and last appears in the tags, as a guide.</p>
+      <p className="muted small">The minute is the clock in that half (e.g. 17 in the 2nd half). Put the sub on the sheet first (marked Sub) so he’s in the “Came on” list. A player who started doesn’t need a sub at 0′: mark him Start. “tagged 41′–70′” is when the player first and last appears in the tags, as a guide.</p>
     </div>
   );
 }
