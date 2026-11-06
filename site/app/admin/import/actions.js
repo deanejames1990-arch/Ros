@@ -2,6 +2,7 @@
 
 import { db } from '../../../lib/db';
 import { requireAdmin } from '../../../lib/session';
+import { scoped, orgScope, orgStamp } from '../../../lib/org';
 
 const clean = (s) => String(s || '').trim();
 
@@ -66,11 +67,11 @@ export async function importGame(p) {
     // teams in either order, whatever competition it was filed under.
     let existing = null;
     if (code) {
-      const { data } = await db.from('matches').select('id, team1_id, team2_id, competition_id').eq('match_code', code).limit(1);
+      const { data } = await (await orgScope())(db.from('matches').select('id, team1_id, team2_id, competition_id')).eq('match_code', code).limit(1);
       existing = data?.[0] || null;
     }
     if (!existing) {
-      const { data, error } = await db.from('matches').select('id, team1_id, team2_id, competition_id')
+      const { data, error } = await (await orgScope())(db.from('matches').select('id, team1_id, team2_id, competition_id'))
         .eq('match_date', p.date)
         .or(`and(team1_id.eq.${t1},team2_id.eq.${t2}),and(team1_id.eq.${t2},team2_id.eq.${t1})`)
         .limit(1);
@@ -101,6 +102,7 @@ export async function importGame(p) {
     } else {
       const competitionId = await findOrCreateCompetition(p.competition, Number(String(p.date).slice(0, 4)) || null);
       const row = {
+        ...(await orgStamp()),
         competition_id: competitionId, match_date: p.date, team1_id: t1, team2_id: t2, ...score,
         stage: clean(p.stage) || null, source: 'nacsport', match_code: code,
       };

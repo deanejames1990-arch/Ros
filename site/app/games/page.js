@@ -3,14 +3,14 @@ import { compType } from '../../lib/analysis';
 import { score } from '../components';
 import { isLiveNow } from '../../lib/live';
 import { currentAccess, gradeOk } from '../../lib/session';
+import { currentOrg, ourTeamRe, scoped, orgScope } from '../../lib/org';
 
 export const dynamic = 'force-dynamic';
 
-const US = /roscommon/i;
 const total = (g, p) => 3 * (g ?? 0) + (p ?? 0);
 
 // Result from one team's side (Roscommon unless another is chosen); null if they didn't play.
-function fromOurSide(m, side = US) {
+function fromOurSide(m, side) {
   const t1 = side.test(m.team1.name), t2 = side.test(m.team2.name);
   if (!t1 && !t2) return null;
   const us = t1 ? { g: m.team1_goals, p: m.team1_points } : { g: m.team2_goals, p: m.team2_points };
@@ -21,13 +21,16 @@ function fromOurSide(m, side = US) {
 
 export default async function Home({ searchParams }) {
   const grade = searchParams.grade || '';
+  const org = await currentOrg();
+  const US = ourTeamRe(org);
+  const OUR = org.team_name;
   const who = ['opp', 'all'].includes(searchParams.who) ? searchParams.who : 'ros';
   const team = who === 'opp' ? (searchParams.team || '') : '';
   const comp = ['League', 'Championship'].find((x) => x.toLowerCase() === String(searchParams.comp || '').toLowerCase()) || '';
   let matches = [];
   let problem = null;
   try {
-    const { data, error } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(500);
+    const { data, error } = await (await orgScope())(db.from('matches').select(MATCH_SELECT)).order('match_date', { ascending: false }).limit(500);
     if (error) problem = error.message;
     const access = await currentAccess();
     matches = (data || []).filter((m) => gradeOk(access, m.competitions?.grade));
@@ -106,7 +109,7 @@ export default async function Home({ searchParams }) {
 
       <nav className="toolbar">
         <div className="seg">
-          <a href={link({ who: 'ros', team: '' })} className={who === 'ros' ? 'on' : ''}>Roscommon</a>
+          <a href={link({ who: 'ros', team: '' })} className={who === 'ros' ? 'on' : ''}>{OUR}</a>
           <a href={link({ who: 'opp', team: '' })} className={who === 'opp' ? 'on' : ''}>Opposition</a>
           <a href={link({ who: 'all', team: '' })} className={who === 'all' ? 'on' : ''}>All</a>
         </div>
@@ -137,15 +140,15 @@ export default async function Home({ searchParams }) {
 
       {(who === 'ros' || team) && (
         <p className="report-link">
-          <a href={`/team/${encodeURIComponent(who === 'ros' ? 'Roscommon' : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}), ...(comp ? { comp: comp.toLowerCase() } : {}) })}`}>
-            Open the {who === 'ros' ? 'Roscommon' : team} report: kick-outs, shooting, quarters, turnovers, players →
+          <a href={`/team/${encodeURIComponent(who === 'ros' ? OUR : team)}?${new URLSearchParams({ ...(year ? { year } : {}), ...(grade ? { grade } : {}), ...(comp ? { comp: comp.toLowerCase() } : {}) })}`}>
+            Open the {who === 'ros' ? OUR : team} report: kick-outs, shooting, quarters, turnovers, players →
           </a>
         </p>
       )}
 
       {sum.P > 0 && (
         <div className="card season">
-          <div className="season-label muted small">{who === 'opp' ? team : 'Roscommon'}</div>
+          <div className="season-label muted small">{who === 'opp' ? team : OUR}</div>
           <div><span className="muted small">Played</span><b>{sum.P}</b></div>
           <div><span className="muted small">Won</span><b>{sum.W}</b></div>
           <div><span className="muted small">Drawn</span><b>{sum.D}</b></div>

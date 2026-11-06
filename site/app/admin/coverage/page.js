@@ -1,6 +1,7 @@
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { isShot, zoneOf } from '../../../lib/analysis';
 import { isLiveCode } from '../../../lib/live';
+import { scoped, orgScope, inOrg } from '../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Data check · James Deane Analysis' };
@@ -32,11 +33,12 @@ function Cell({ a, b, warnBelow = 80 }) {
 }
 
 export default async function Coverage({ searchParams }) {
-  const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false });
+  const { data: all } = await (await orgScope())(db.from('matches').select(MATCH_SELECT)).order('match_date', { ascending: false });
   const grades = [...new Set((all || []).map((m) => m.competitions?.grade).filter(Boolean))];
   const grade = grades.includes(searchParams?.grade) ? searchParams.grade : '';
   const games = (all || []).filter((m) => !grade || m.competitions?.grade === grade);
-  const { data: apps } = await db.from('appearances').select('match_id, team_id');
+  const { data: appsAll } = await db.from('appearances').select('match_id, team_id');
+  const apps = await inOrg(appsAll);
   const sheet = new Set((apps || []).map((a) => `${a.match_id}:${a.team_id}`));
   const rows = await Promise.all(games.map(async (m) => {
     const ev = await loadEvents(m.id);

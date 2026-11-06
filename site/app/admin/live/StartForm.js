@@ -9,7 +9,7 @@ function Go() {
   return <button type="submit" className="primary" disabled={pending}>{pending ? 'Starting…' : 'Start tagging'}</button>;
 }
 
-export default function StartForm({ teams, competitions, today }) {
+export default function StartForm({ us = 'Roscommon', teams, competitions, today }) {
   const [state, action] = useFormState(startLiveGame, null);
   const [comp, setComp] = useState(competitions[0]?.id ? String(competitions[0].id) : '');
   const [grade, setGrade] = useState(competitions[0]?.grade || 'Senior');
@@ -18,7 +18,7 @@ export default function StartForm({ teams, competitions, today }) {
   return (
     <form action={action} className="card live-start">
       <datalist id="live-teams">{teams.map((t) => <option key={t} value={t} />)}</datalist>
-      <label>Our team<input name="us" defaultValue="Roscommon" list="live-teams" required /></label>
+      <label>Our team<input name="us" defaultValue={us} list="live-teams" required /></label>
       <label>Opposition<input name="them" list="live-teams" placeholder="e.g. Mayo" required /></label>
       <label>Home team
         <select name="home" defaultValue="us"><option value="us">Our team</option><option value="them">Opposition</option></select>

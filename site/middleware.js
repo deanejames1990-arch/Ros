@@ -10,6 +10,7 @@ export async function middleware(req) {
   const s = await readSession(req.cookies.get(COOKIE)?.value);
   let role = s?.role || null;
   if (s?.uid) role = (await lookupUser(s.uid))?.role || null;
+  if (role === 'super') role = 'admin';
   const needAdmin = pathname.startsWith('/admin') && !pathname.startsWith('/admin/live');
   const needTagger = pathname.startsWith('/admin/live');
   const ok = role === 'admin' || (role === 'tagger' && !needAdmin) || (role === 'viewer' && !needAdmin && !needTagger);

@@ -2,15 +2,17 @@ import { db } from '../../lib/db';
 import { currentRole } from '../../lib/session';
 import { BRIEFING_SQL } from '../../lib/briefing';
 import NewBriefing from './NewBriefing';
+import { scoped, pickerTeams, currentOrg, isOurTeam } from '../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Briefings · James Deane Analysis' };
 
 export default async function Briefings() {
   const role = await currentRole();
+  const org = await currentOrg();
   const admin = role === 'admin';
   const [{ data: list, error }, { data: teams }] = await Promise.all([
-    db.from('briefings').select('id, title, team_id, game_ids, published, updated_at').order('updated_at', { ascending: false }),
+    scoped(db.from('briefings').select('id, title, team_id, game_ids, published, updated_at').order('updated_at', { ascending: false })),
     db.from('teams').select('id, name').order('name'),
   ]);
   const missing = error && /does not exist|could not find|schema cache/i.test(error.message);
@@ -30,7 +32,7 @@ export default async function Briefings() {
         ) : <p className="card muted">No briefings yet.</p>
       ) : (
         <>
-          {admin && <NewBriefing teams={(teams || []).filter((t) => !/roscommon/i.test(t.name))} />}
+          {admin && <NewBriefing teams={(await pickerTeams(teams)).filter((t) => !isOurTeam(org, t.name))} />}
           {shown.length === 0 && <p className="card muted">No briefings yet.</p>}
           <div className="game-strip">
             {shown.map((b) => (

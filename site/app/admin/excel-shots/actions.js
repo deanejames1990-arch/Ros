@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { db, MATCH_SELECT, loadEvents } from '../../../lib/db';
 import { requireAdmin } from '../../../lib/session';
+import { scoped } from '../../../lib/org';
 
 const low = (s) => String(s || '').trim().toLowerCase();
 const isShot = (e) => /^shot/i.test(e.event_type || '');
@@ -31,7 +32,7 @@ function findGame(all, g) {
 export async function matchExcelShots(games, { apply = false, overwrite = false, pick = {} } = {}) {
   try {
     await requireAdmin();
-    const { data: all, error } = await db.from('matches').select(MATCH_SELECT);
+    const { data: all, error } = await scoped(db.from('matches').select(MATCH_SELECT));
     if (error) throw new Error(error.message);
     const out = [];
     for (const g of games || []) {

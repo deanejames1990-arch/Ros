@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { db } from '../../../lib/db';
 import { requireTagger } from '../../../lib/session';
+import { currentOrg, orgStamp, matchVisible } from '../../../lib/org';
 import { syncAppearanceScores, syncSubMinutes } from '../sheet-actions';
 import { LIVE_PREFIX, isLiveCode, isFinishedCode, toRow, withPossessions } from '../../../lib/live';
 
@@ -65,7 +66,7 @@ export async function startLiveGame(_prev, form) {
     const date = clean(form.get('date'));
     if (!date) throw new Error('Please enter the date.');
     const year = Number(date.slice(0, 4));
-    const us = clean(form.get('us')) || 'Roscommon';
+    const us = clean(form.get('us')) || (await currentOrg()).team_name;
     const them = clean(form.get('them'));
     if (!them) throw new Error('Who are they playing?');
     const [a, b] = await Promise.all([findOrCreateTeam(us), findOrCreateTeam(them)]);
@@ -76,6 +77,7 @@ export async function startLiveGame(_prev, form) {
     const home = form.get('home') === 'them';
     const halfLen = Number(form.get('halfLen')) || 35;
     const row = {
+      ...(await orgStamp()),
       competition_id, match_date: date,
       team1_id: home ? b : a, team2_id: home ? a : b,
       team1_goals: 0, team1_points: 0, team2_goals: 0, team2_points: 0,
@@ -99,9 +101,9 @@ export async function startLiveGame(_prev, form) {
 export async function saveLiveGame(matchId, events, opts = {}) {
   try {
     const { data: m, error } = await db.from('matches')
-      .select('id, match_code, competitions(grade), team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
+      .select('id, match_code, org_id, competitions(grade), team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
       .eq('id', Number(matchId)).single();
-    if (error || !m) throw new Error('Game not found.');
+    if (error || !m || !(await matchVisible(m))) throw new Error('Game not found.');
     await requireTagger(m.competitions?.grade || '');
     if (!isLiveCode(m.match_code)) throw new Error('This game was not started in the live tagger.');
     const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];

@@ -6,6 +6,7 @@ import { analyseMatch, combineSides, withoutNames } from './analysis';
 import { nameEvents, isNumberTag } from './players';
 import { getAliases } from './aliases';
 import { gradeOk } from './session';
+import { scoped, orgScope } from './org';
 
 export const BRIEFING_SQL = `create table if not exists briefings (
   id bigint generated always as identity primary key,
@@ -35,7 +36,7 @@ export async function briefingData(teamIdIn, gameIds, access, admin) {
   const teamId = Number(teamIdIn);
   const { data: t } = await db.from('teams').select('id, name').eq('id', teamId).single();
   if (!t) return null;
-  const { data: all } = await db.from('matches').select(MATCH_SELECT)
+  const { data: all } = await (await orgScope())(db.from('matches').select(MATCH_SELECT))
     .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`).order('match_date', { ascending: false });
   const games = (all || []).filter((m) => (m.team1_id === teamId || m.team2_id === teamId) && gradeOk(access, m.competitions?.grade));
   const chosenIds = gameIds?.length ? gameIds.map(Number) : games.slice(0, 4).map((m) => m.id);

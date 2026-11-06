@@ -154,12 +154,12 @@ export function readTables(json) {
   return tabs;
 }
 
-const COUNTIES = ['Antrim', 'Armagh', 'Carlow', 'Cavan', 'Clare', 'Cork', 'Derry', 'Donegal', 'Down', 'Dublin', 'Fermanagh', 'Galway',
+export const COUNTIES = ['Antrim', 'Armagh', 'Carlow', 'Cavan', 'Clare', 'Cork', 'Derry', 'Donegal', 'Down', 'Dublin', 'Fermanagh', 'Galway',
   'Kerry', 'Kildare', 'Kilkenny', 'Laois', 'Leitrim', 'Limerick', 'Longford', 'Louth', 'Mayo', 'Meath', 'Monaghan', 'Offaly',
   'Roscommon', 'Sligo', 'Tipperary', 'Tyrone', 'Waterford', 'Westmeath', 'Wexford', 'Wicklow', 'London', 'New York'];
 
 // Guess teams, date, competition and stage from the file name.
-export function guessFromName(name = '', videoName = '') {
+export function guessFromName(name = '', videoName = '', our = 'Roscommon') {
   const clean = (x) => x.replace(/\.(json|nac_to_import|mp4|mov)$/i, '').replace(/_/g, ' ').replace(/\(.*?\)/g, ' ').replace(/[.\s]+$/, '').trim();
   let base = clean(name);
   const vs = /^(.*?)\s+(?:v|vs|v\.|versus)\s+(.+)$/i;
@@ -189,9 +189,9 @@ export function guessFromName(name = '', videoName = '') {
   const u = base.toUpperCase();
   let competition = '';
   if (!home && !away) {
-    // One county named on its own (e.g. "Mayo_Rd1_Total"): Roscommon v that county.
-    const c = COUNTIES.find((x) => new RegExp(`\\b${x}\\b`, 'i').test(base) && !/roscommon/i.test(x));
-    if (c) { home = 'Roscommon'; away = c; }
+    // One county named on its own (e.g. "Mayo_Rd1_Total"): our team v that county.
+    const c = COUNTIES.find((x) => new RegExp(`\\b${x}\\b`, 'i').test(base) && x.toLowerCase() !== String(our).toLowerCase());
+    if (c) { home = our; away = c; }
   }
   if (/\bNFL\d*|\bLEAGUE\b/.test(u)) competition = 'National Football League';
   else if (/\bAI[C]?\b|ALL[- ]IRELAND/.test(u)) competition = 'All-Ireland SFC';

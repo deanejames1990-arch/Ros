@@ -2,16 +2,22 @@ import { db, MATCH_SELECT } from '../../lib/db';
 import { score } from '../components';
 import { passwords } from '../../lib/auth';
 import { CompetitionForm, TeamForm } from './forms';
+import { scoped, orgScope, onlyOrgComps, currentOrg } from '../../lib/org';
+import { currentAccess } from '../../lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Manage · James Deane Analysis' };
 
 export default async function Manage({ searchParams }) {
-  const [{ data: matches }, { data: comps }, { data: counts }] = await Promise.all([
-    db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: false }).limit(1000),
+  const [{ data: matches }, { data: allComps }, { data: counts }, access, org] = await Promise.all([
+    (await orgScope())(db.from('matches').select(MATCH_SELECT)).order('match_date', { ascending: false }).limit(1000),
     db.from('competitions').select('id, name, grade, show_player_names, seasons(year)'),
-    db.from('matches').select('competition_id'),
+    scoped(db.from('matches').select('competition_id')),
+    currentAccess(),
+    currentOrg(),
   ]);
+  const owner = Boolean(access?.isSuper);
+  const comps = await onlyOrgComps(allComps);
   const competitions = (comps || []).map((c) => ({ ...c, year: c.seasons?.year }))
     .sort((a, b) => (b.year || 0) - (a.year || 0) || (a.grade || '').localeCompare(b.grade || '') || a.name.localeCompare(b.name));
   const n = {};
@@ -64,6 +70,9 @@ export default async function Manage({ searchParams }) {
         </table>
       </div>
 
+      {owner && <a href="/admin/orgs" className="card people-link"><b>Organisations</b> <span className="muted small">Clubs and counties using the site: add one, its crest and team, and its first admin</span></a>}
+
+      {owner && <>
       <h2 id="teams">Teams</h2>
       {searchParams.teams && <p className="card check ok small">Team {searchParams.teams}.</p>}
       <p className="muted small">Rename a team, or merge a duplicate into the right one (all its games, tags, team sheets and tidied names move across). Likely duplicates are flagged.</p>
@@ -73,9 +82,10 @@ export default async function Manage({ searchParams }) {
           {teamList.map((t) => <TeamForm key={t.id} t={t} games={t.games} suspect={t.suspect} others={teamList.filter((o) => o.id !== t.id)} />)}
         </div>
       </details>
+      </>}
 
       <h2>Competitions</h2>
-      <p className="muted small">Rename, set the grade, hide player names (underage), or merge a duplicate into another competition.</p>
+      <p className="muted small">Rename, set the grade, hide player names (underage), or merge a duplicate into another competition.{!owner && org.ready ? ' A competition other organisations also use can only be changed by the site owner.' : ''}</p>
       <div className="admin-comps">
         {competitions.map((c) => (
           <CompetitionForm key={c.id} c={c} games={n[c.id] || 0} others={competitions.filter((o) => o.id !== c.id)} />

@@ -3,6 +3,7 @@
 // works for every game, including files imported later.
 import { cache } from 'react';
 import { db } from './db';
+import { scoped } from './org';
 
 export const ALIAS_SQL = `create table if not exists name_aliases (
   id bigint generated always as identity primary key,
@@ -16,7 +17,7 @@ alter table name_aliases enable row level security;`;
 
 // All aliases (a small table), once per request. [] if the table isn't set up yet.
 export const getAliases = cache(async () => {
-  const { data, error } = await db.from('name_aliases').select('team_id, alias, name');
+  const { data, error } = await scoped(db.from('name_aliases').select('team_id, alias, name'));
   if (error) return [];
   return data || [];
 });

@@ -2,6 +2,7 @@
 
 import { db, loadEvents } from '../../lib/db';
 import { requireAdmin, requireTagger } from '../../lib/session';
+import { assertMatch, inOrg, orgMatchIds } from '../../lib/org';
 import { scoresFromTags } from '../../lib/players';
 
 const clean = (s) => String(s || '').trim().replace(/\s+/g, ' ');
@@ -63,6 +64,7 @@ export async function saveTeamSheet(matchId, teamId, entries) {
     const mid = Number(matchId), tid = Number(teamId);
     const { data: gm } = await db.from('matches').select('competitions(grade)').eq('id', mid).single();
     await requireTagger(gm?.competitions?.grade || '');
+    await assertMatch(mid);
     // on / off: came-on and went-off minutes; left out (undefined) keeps what's saved.
     const list = (entries || []).map((e) => ({ no: Number(e.no) || null, name: clean(e.name), id: Number(e.id) || null, on: e.on, off: e.off })).filter((e) => e.name);
     const seen = new Set();
@@ -71,14 +73,17 @@ export async function saveTeamSheet(matchId, teamId, entries) {
       if (e.no) seen.add(e.no);
     }
 
-    // Everyone who has played for this team, by name.
-    const { data: past } = await db.from('appearances').select('player_id, players(id, name)').eq('team_id', tid).limit(5000);
+    // Everyone who has played for this team in this organisation's games, by name.
+    // (Each organisation keeps its own player records.)
+    const { data: pastAll } = await db.from('appearances').select('match_id, player_id, players(id, name)').eq('team_id', tid).limit(5000);
+    const past = await inOrg(pastAll);
     const squad = new Map();
     for (const a of past || []) if (a.players?.name) squad.set(a.players.name.toLowerCase(), a.players.id);
 
     const out = [];
     for (const e of list) {
       let id = e.id;
+      if (id && ![...squad.values()].includes(id) && (await orgMatchIds())) id = null; // not one of this organisation's players
       if (id) {
         const { data: p } = await db.from('players').select('id, name').eq('id', id).maybeSingle();
         if (!p) id = null;
@@ -135,9 +140,14 @@ export async function mergePlayers(fromId, intoId) {
     await requireAdmin();
     const a = Number(fromId), b = Number(intoId);
     if (!a || !b || a === b) throw new Error('Pick a different player to merge into.');
-    const { error } = await db.from('appearances').update({ player_id: b }).eq('player_id', a);
+    // Only this organisation's appearances move; the old record goes once nothing uses it.
+    const ids = await orgMatchIds();
+    let q = db.from('appearances').update({ player_id: b }).eq('player_id', a);
+    if (ids) q = q.in('match_id', [...ids]);
+    const { error } = await q;
     if (error) throw new Error(error.message);
-    await db.from('players').delete().eq('id', a);
+    const { count } = await db.from('appearances').select('id', { count: 'exact', head: true }).eq('player_id', a);
+    if (!count) await db.from('players').delete().eq('id', a);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };

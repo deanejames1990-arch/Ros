@@ -11,6 +11,7 @@ import { nameEvents, isNumberTag } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
 import { currentRole, currentAccess, gradeOk } from '../../../lib/session';
 import { getCrests, CREST_SQL } from '../../../lib/crests';
+import { scoped, orgScope } from '../../../lib/org';
 import Crest from '../../Crest';
 import CrestUpload from './CrestUpload';
 
@@ -27,7 +28,7 @@ export default async function TeamReport({ params, searchParams }) {
   const teamName = teams[0].name;
 
   const access = await currentAccess();
-  const { data: allGames } = await db.from('matches').select(MATCH_SELECT)
+  const { data: allGames } = await (await orgScope())(db.from('matches').select(MATCH_SELECT))
     .or(`team1_id.in.(${ids.join(',')}),team2_id.in.(${ids.join(',')})`)
     .order('match_date', { ascending: false });
   const all = (allGames || []).filter((m) => gradeOk(access, m.competitions?.grade));

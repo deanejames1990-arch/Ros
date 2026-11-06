@@ -2,6 +2,7 @@
 // before it, and the squad (everyone who has played for the team) for picking.
 import { db } from './db';
 import { sheetFromApps } from './players';
+import { inOrg } from './org';
 
 export async function sheetData(matchId, teams) {
   const out = {};
@@ -9,7 +10,7 @@ export async function sheetData(matchId, teams) {
     const { data } = await db.from('appearances')
       .select('match_id, jersey_no, player_id, sub_on_minute, sub_off_minute, players(id, name), matches(match_date)')
       .eq('team_id', t.id).limit(5000);
-    const rows = data || [];
+    const rows = await inOrg(data); // this organisation's sheets only
     const current = rows.filter((a) => a.match_id === Number(matchId));
     // The most recent other game with a sheet for this team.
     const others = rows.filter((a) => a.match_id !== Number(matchId) && a.matches?.match_date);

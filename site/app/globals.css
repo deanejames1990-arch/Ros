@@ -803,3 +803,10 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .zones.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:700px){.zones.split{grid-template-columns:1fr}}
 .shotmap-seg{margin:0 auto 8px;width:max-content}
+.org-switch select{max-width:200px;font-size:.85rem;padding:4px 8px;border-radius:8px}
+.site-foot{text-align:center;color:var(--mut);font-size:.75rem;padding:24px 16px 32px}
+.org-list{display:grid;gap:10px}
+.org-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.org-who{flex:1;min-width:200px}
+.org.current{border-color:var(--g)}
+.badge-on{font-size:.7rem;background:#e8f4ec;color:#2e7d4f;border-radius:6px;padding:2px 6px;font-weight:700}

@@ -43,7 +43,8 @@ function same(a, b) {
   return r === 0;
 }
 
-export const ROLES = ['viewer', 'tagger', 'admin'];
+// super: sees and runs every organisation (you). The shared ADMIN_PASSWORD signs in as super too.
+export const ROLES = ['viewer', 'tagger', 'admin', 'super'];
 
 // Token: role.expiry.userId.signature. userId 0 = a shared password from Vercel;
 // otherwise a person from the site_users table (checked on every request, so
@@ -103,13 +104,16 @@ export async function lookupUser(uid) {
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key || !uid) return null;
   try {
-    const r = await fetch(`${url}/rest/v1/site_users?id=eq.${Number(uid)}&select=id,name,role,grades,active`, {
+    const get = (cols) => fetch(`${url}/rest/v1/site_users?id=eq.${Number(uid)}&select=${cols}`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store',
     });
+    // org_id only exists once organisations are set up.
+    let r = await get('id,name,role,grades,active,org_id');
+    if (!r.ok) r = await get('id,name,role,grades,active');
     if (!r.ok) return null;
     const [u] = await r.json();
     if (!u || !u.active || !ROLES.includes(u.role)) return null;
-    return { role: u.role, grades: u.grades?.length ? u.grades : null, name: u.name };
+    return { role: u.role, grades: u.grades?.length ? u.grades : null, name: u.name, orgId: u.org_id ?? null };
   } catch {
     return null;
   }

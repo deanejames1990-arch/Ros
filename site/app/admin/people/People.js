@@ -5,7 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { addPerson, updatePerson, resetCode, setActive, removePerson, setPassword, saveAvatar } from './actions';
 import Avatar from '../../Avatar';
 
-const ROLE_TEXT = { viewer: 'Viewer', tagger: 'Tagger', admin: 'Admin' };
+const ROLE_TEXT = { viewer: 'Viewer', tagger: 'Tagger', admin: 'Admin', super: 'Site owner' };
 const when = (t) => (t ? new Date(t).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'never');
 
 function Save({ label }) {
@@ -13,7 +13,7 @@ function Save({ label }) {
   return <button type="submit" disabled={pending}>{pending ? 'Saving…' : label}</button>;
 }
 
-function Fields({ grades, p = {} }) {
+function Fields({ grades, p = {}, owner = false }) {
   const [role, setRole] = useState(p.role || 'viewer');
   return (
     <>
@@ -23,10 +23,11 @@ function Fields({ grades, p = {} }) {
         <select name="role" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="viewer">Viewer: sees the stats</option>
           <option value="tagger">Tagger: stats + live tagger and team sheets</option>
-          <option value="admin">Admin: everything</option>
+          <option value="admin">Admin: everything in this organisation</option>
+          {(owner || p.role === 'super') && <option value="super">Site owner: every organisation</option>}
         </select>
       </label>
-      {role !== 'admin' && grades.length > 1 && (
+      {role !== 'admin' && role !== 'super' && grades.length > 1 && (
         <fieldset className="grade-picks">
           <legend>Grades <span className="muted small">(none ticked = all grades)</span></legend>
           {grades.map((g) => (
@@ -119,7 +120,7 @@ function PhotoEdit({ p, src }) {
   );
 }
 
-function Person({ p, grades, onCode, avatar }) {
+function Person({ p, grades, onCode, avatar, owner }) {
   const [open, setOpen] = useState(false);
   const dlg = useRef(null);
   useEffect(() => {
@@ -152,7 +153,7 @@ function Person({ p, grades, onCode, avatar }) {
         {open && <PhotoEdit p={p} src={avatar} />}
         <h3>Details and access</h3>
         <form action={action} className="person-form">
-          <Fields grades={grades} p={p} />
+          <Fields grades={grades} p={p} owner={owner} />
           <div className="person-foot">
             <Save label="Save changes" />
             {state?.ok && <span className="ok small">Saved</span>}
@@ -176,7 +177,7 @@ function Person({ p, grades, onCode, avatar }) {
   );
 }
 
-export default function People({ people, grades, avatars = {} }) {
+export default function People({ people, grades, avatars = {}, owner = false }) {
   const [state, action] = useFormState(addPerson, null);
   const [shown, setShown] = useState(null);
   const [formKey, setFormKey] = useState(0);
@@ -190,7 +191,7 @@ export default function People({ people, grades, avatars = {} }) {
       {shown && <CodeBox name={shown.name} code={shown.code} onClose={() => { setShown(null); window.location.reload(); }} />}
       <h2>Add a person</h2>
       <form key={formKey} action={action} className="card person-form">
-        <Fields grades={grades} />
+        <Fields grades={grades} owner={owner} />
         <div className="person-foot">
           <Save label="Add and create code" />
           {state?.error && <span className="check warn small">{state.error}</span>}
@@ -199,7 +200,7 @@ export default function People({ people, grades, avatars = {} }) {
       <h2>{people.length} {people.length === 1 ? 'person' : 'people'} <span className="muted small">· {active} with access</span></h2>
       {people.length === 0 && <p className="muted">Nobody added yet.</p>}
       <div className="people-list">
-        {people.map((p) => <Person key={p.id} p={p} grades={grades} avatar={avatars[p.id]} onCode={(name, c) => setShown({ name, code: c })} />)}
+        {people.map((p) => <Person key={p.id} p={p} grades={grades} owner={owner} avatar={avatars[p.id]} onCode={(name, c) => setShown({ name, code: c })} />)}
       </div>
     </>
   );

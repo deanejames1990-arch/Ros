@@ -5,6 +5,7 @@ import { getAliases } from '../lib/aliases';
 import { isLiveNow } from '../lib/live';
 import { currentAccess, gradeOk } from '../lib/session';
 import { winningTrends, koRanges } from '../lib/winning';
+import { currentOrg, ourTeamRe, scoped, orgScope } from '../lib/org';
 import { score } from './components';
 import { playerHref } from './report/sections';
 import TrendChart from './TrendChart';
@@ -14,7 +15,6 @@ import { PssTable, QuarterTrend } from './report/sections';
 
 export const dynamic = 'force-dynamic';
 
-const US = /roscommon/i;
 const ROS = '#3b4f9e';
 const OPP = '#c4572a';
 const ORDER = ['Senior', 'Junior', 'U21', 'U20', 'Minor', 'U17', 'Club'];
@@ -26,7 +26,11 @@ export default async function Home({ searchParams }) {
   const access = await currentAccess();
   const role = access?.role;
   const admin = role === 'admin';
-  const { data: all } = await db.from('matches').select(MATCH_SELECT).order('match_date', { ascending: true });
+  const org = await currentOrg();
+  const US = ourTeamRe(org);
+  const OUR = org.team_name;
+  const ourHref = `/team/${encodeURIComponent(OUR)}`;
+  const { data: all } = await (await orgScope())(db.from('matches').select(MATCH_SELECT)).order('match_date', { ascending: true });
   // Only the grades this person can see.
   const games = (all || []).filter((m) => gradeOk(access, m.competitions?.grade));
   const live = games.filter(isLiveNow);
@@ -108,10 +112,10 @@ export default async function Home({ searchParams }) {
   const form = [...rows].slice(-5);
 
   const tiles = [
-    { href: '/games', t: 'Games', d: `${games.length} games: Roscommon and opposition, by season and competition` },
+    { href: '/games', t: 'Games', d: `${games.length} games: ${OUR} and opposition, by season and competition` },
     { href: '/teams', t: 'Teams', d: 'Every county on the site: opposition reports and squads' },
     { href: '/briefing', t: 'Opposition briefings', d: 'Team lists, scorers, shooting, kick-outs and clips for the next opponent' },
-    { href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, t: 'Roscommon report', d: `${grade} ${year || ''}: kick-outs, shooting, turnovers, players` },
+    { href: `${ourHref}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, t: `${OUR} report`, d: `${grade} ${year || ''}: kick-outs, shooting, turnovers, players` },
     ...(admin || role === 'tagger' ? [
       { href: '/admin/live', t: 'Live tagger', d: 'Tag a game as it happens, with quarter and half-time numbers', admin: true },
     ] : []),
@@ -125,7 +129,7 @@ export default async function Home({ searchParams }) {
   const hour = Number(new Intl.DateTimeFormat('en-IE', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Dublin' }).format(new Date()));
   const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const first = String(access?.name || '').trim().split(/\s+/)[0] || '';
-  const { data: briefs } = await db.from('briefings').select('id, title, updated_at, published').eq('published', true).order('updated_at', { ascending: false }).limit(1);
+  const { data: briefs } = await (await orgScope())(db.from('briefings').select('id, title, updated_at, published')).eq('published', true).order('updated_at', { ascending: false }).limit(1);
   const brief = (briefs || [])[0];
   const freshBrief = brief && Date.now() - new Date(brief.updated_at).getTime() < 14 * 864e5 ? brief : null;
   const last = [...rows].reverse()[0];
@@ -164,7 +168,7 @@ export default async function Home({ searchParams }) {
       </nav>
 
       <div className="hero home-hero">
-        <h1>Roscommon {grade && grade !== 'Senior' ? grade : ''} {year || ''}</h1>
+        <h1>{OUR} {grade && grade !== 'Senior' ? grade : ''} {year || ''}</h1>
         <nav className="toolbar">
           {grades.length > 1 && <div className="seg">{grades.map((g) => <a key={g} href={homeLink({ grade: g, year: '' })} className={g === grade ? 'on' : ''}>{g}</a>)}</div>}
           {years.length > 1 && <div className="seg">{years.map((y) => <a key={y} href={homeLink({ year: y })} className={y === year ? 'on' : ''}>{y}</a>)}</div>}
@@ -172,7 +176,7 @@ export default async function Home({ searchParams }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="card muted">No Roscommon games for this season yet.</p>
+        <p className="card muted">No {OUR} games for this season yet.</p>
       ) : (
         <>
           <div className="home-stats">
@@ -186,7 +190,7 @@ export default async function Home({ searchParams }) {
               const qs = tagged.filter((r) => r.us.possessions > 0).flatMap((r) => r.us.pss);
               const h = hitRates(qs, t);
               return h ? (
-                <a href={`/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`} className="card stat stat-link">
+                <a href={`${ourHref}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`} className="card stat stat-link">
                   <span className="stat-k">Quarters at {targetText(t)}</span>
                   <b className="num">{h.all} <small>of</small> {h.n}</b>
                   <span className="muted small">poss {h.poss} · shots {h.shots} · scores {h.scores} of {h.n} met</span>
@@ -200,35 +204,35 @@ export default async function Home({ searchParams }) {
           </div>
 
           <h2>Possessions – shots – scores</h2>
-          <QuarterTrend name="Roscommon" trend={usTrend} t={targetFor(grade)} color={ROS} />
+          <QuarterTrend name={OUR} trend={usTrend} t={targetFor(grade)} color={ROS} />
           <PssTable t={targetFor(grade)}
             rows={[
-              { name: 'Roscommon', strong: true, color: ROS, href: `/team/Roscommon?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)), trend: usTrend },
-              { name: 'Opposition v Roscommon', color: OPP, s: pssSummary(tagged.map((r) => r.them)), trend: quarterTrend(tagged.map((r) => ({ mine: r.them, opp: r.us }))) },
+              { name: OUR, strong: true, color: ROS, href: `${ourHref}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`, s: pssSummary(tagged.map((r) => r.us)), trend: usTrend },
+              { name: `Opposition v ${OUR}`, color: OPP, s: pssSummary(tagged.map((r) => r.them)), trend: quarterTrend(tagged.map((r) => ({ mine: r.them, opp: r.us }))) },
               ...oppRows.map((r) => ({
                 name: r.name, s: r.s, trend: r.trend, note: r.v ? `(${r.v} v Ros)` : '',
                 href: `/team/${encodeURIComponent(r.name)}?${new URLSearchParams({ grade, ...(year ? { year: String(year) } : {}) })}`,
               })),
             ]}
-            caption={`${grade} ${year || ''}: Roscommon's tagged games, then every opposition team from all their tagged games on the site this season (against Roscommon and scouted). Possessions are as tagged, or worked out from the play where a file has none.${targetFor(grade) ? ` Average quarter marked against ${targetText(targetFor(grade))}.` : ''}`} />
+            caption={`${grade} ${year || ''}: ${OUR}'s tagged games, then every opposition team from all their tagged games on the site this season (against ${OUR} and scouted). Possessions are as tagged, or worked out from the play where a file has none.${targetFor(grade) ? ` Average quarter marked against ${targetText(targetFor(grade))}.` : ''}`} />
 
-          {win.rows.length > 0 && <WinningTrends win={win} grade={grade} year={year} />}
-          {(koR.opp || koR.own) && <KickoutRanges r={koR} />}
+          {win.rows.length > 0 && <WinningTrends win={win} grade={grade} year={year} our={OUR} />}
+          {(koR.opp || koR.own) && <KickoutRanges r={koR} our={OUR} />}
 
           <h2>Trends, game by game</h2>
           <div className="trend-grid">
             <TrendChart title="Points scored v conceded" games={chartGames}
-              series={[{ name: 'Roscommon', color: ROS, values: rows.map((r) => r.f) }, { name: 'Opposition', color: OPP, values: rows.map((r) => r.a) }]} />
+              series={[{ name: OUR, color: ROS, values: rows.map((r) => r.f) }, { name: 'Opposition', color: OPP, values: rows.map((r) => r.a) }]} />
             <TrendChart title="Shot conversion" unit="%" min={0} max={100} games={chartGames}
-              series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.conv) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.conv) }]}
+              series={[{ name: OUR, color: ROS, values: tg((r) => r.us.conv) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.conv) }]}
               note={tagged.length < rows.length ? 'Gaps are games without tags.' : null} />
             {usAll.kickouts.retPct != null && (
               <TrendChart title="Own kick-outs won" unit="%" min={0} max={100} games={chartGames}
-                series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.kickouts.retPct) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.kickouts.retPct) }]} />
+                series={[{ name: OUR, color: ROS, values: tg((r) => r.us.kickouts.retPct) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.kickouts.retPct) }]} />
             )}
             {usAll.shots > 0 && (
               <TrendChart title="Shots a game" games={chartGames}
-                series={[{ name: 'Roscommon', color: ROS, values: tg((r) => r.us.shots) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.shots) }]} />
+                series={[{ name: OUR, color: ROS, values: tg((r) => r.us.shots) }, { name: 'Opposition', color: OPP, values: tg((r) => r.them.shots) }]} />
             )}
           </div>
 
@@ -241,7 +245,7 @@ export default async function Home({ searchParams }) {
                     <thead><tr><th>Player</th><th>Games</th><th>Score</th><th>Shots</th></tr></thead>
                     <tbody>
                       {scorers.map((p) => {
-                        const href = playerHref('Roscommon', p.name, null);
+                        const href = playerHref(OUR, p.name, null);
                         return (
                           <tr key={p.name}>
                             <td>{href ? <a href={href}>{p.name}</a> : p.name}</td>
@@ -278,7 +282,7 @@ export default async function Home({ searchParams }) {
 }
 
 // What winning teams do: the stats where being ahead goes with winning.
-function WinningTrends({ win, grade, year }) {
+function WinningTrends({ win, grade, year, our }) {
   const top = win.rows.filter((r) => !r.few && r.winPct >= 60).slice(0, 3);
   const fmt = (r, v) => (v == null ? '—' : r.side ? `${v}% of games` : `${v}${r.unit || ''}`);
   const better = (r) => {
@@ -291,7 +295,7 @@ function WinningTrends({ win, grade, year }) {
     <>
       <h2>What wins games</h2>
       <div className="card win-card">
-        <p className="small muted">{grade} {year || ''}: the winner and loser compared in {win.games} tagged game{win.games === 1 ? '' : 's'} (Roscommon’s and scouted, draws left out).</p>
+        <p className="small muted">{grade} {year || ''}: the winner and loser compared in {win.games} tagged game{win.games === 1 ? '' : 's'} ({our}’s and scouted, draws left out).</p>
         {top.length > 0 && (
           <div className="win-calls">
             {top.map((r) => (
@@ -304,7 +308,7 @@ function WinningTrends({ win, grade, year }) {
         )}
         <div className="wrap">
           <table className="win-table">
-            <thead><tr><th>When a team…</th><th>…it won</th><th>Winners</th><th>Losers</th><th>Roscommon</th></tr></thead>
+            <thead><tr><th>When a team…</th><th>…it won</th><th>Winners</th><th>Losers</th><th>{our}</th></tr></thead>
             <tbody>
               {win.rows.map((r) => {
                 const ok = better(r);
@@ -323,14 +327,14 @@ function WinningTrends({ win, grade, year }) {
             </tbody>
           </table>
         </div>
-        <p className="small muted">“…it won” is how often the team ahead on that stat won (games level on it are left out). Winners / losers are the averages a game. Roscommon’s column is our average this season: ✓ at or better than the winners’ average, ✗ short of it. Small numbers of games swing these a lot.</p>
+        <p className="small muted">“…it won” is how often the team ahead on that stat won (games level on it are left out). Winners / losers are the averages a game. {our}’s column is our average this season: ✓ at or better than the winners’ average, ✗ short of it. Small numbers of games swing these a lot.</p>
       </div>
     </>
   );
 }
 
 // Kick-out ranges that go with winning: the other team's kick-outs won, and our own kept.
-function KickoutRanges({ r }) {
+function KickoutRanges({ r, our }) {
   const Part = ({ title, d, what }) => {
     if (!d) return null;
     const band = (b) => (b.hi > 100 ? `${b.lo}%+` : b.lo === 0 ? `under ${b.hi}%` : `${b.lo}–${b.hi - 1}%`);
@@ -346,13 +350,13 @@ function KickoutRanges({ r }) {
           <tbody>
             {d.bands.filter((b) => b.n).map((b) => (
               <tr key={b.lo} className={rosBand === b ? 'ros' : ''}>
-                <td>{band(b)}{rosBand === b ? <small> · Roscommon avg</small> : ''}</td>
+                <td>{band(b)}{rosBand === b ? <small> · {our} avg</small> : ''}</td>
                 <td className="num"><span className="win-bar"><i style={{ width: `${b.pct}%` }} /></span> {b.won} of {b.n} <small className="muted">({b.pct}%)</small></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="small muted">Middle value: winners {d.winners}% · losers {d.losers}%{d.ros != null ? <> · <b>Roscommon {d.ros}%</b> ({d.rosGames} game{d.rosGames === 1 ? '' : 's'})</> : ''}</p>
+        <p className="small muted">Middle value: winners {d.winners}% · losers {d.losers}%{d.ros != null ? <> · <b>{our} {d.ros}%</b> ({d.rosGames} game{d.rosGames === 1 ? '' : 's'})</> : ''}</p>
       </div>
     );
   };

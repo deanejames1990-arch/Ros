@@ -12,6 +12,7 @@ import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
 import { nameEvents } from '../../../lib/players';
 import { getAliases } from '../../../lib/aliases';
+import { currentOrg, isOurTeam, matchVisible } from '../../../lib/org';
 import { targetFor, targetText, hit } from '../../../lib/targets';
 import { Pss } from '../../report/sections';
 import { KickoutSection, ShootingSection, PeriodSection, TurnoverSection, PlayerTable } from '../../report/sections';
@@ -23,8 +24,9 @@ const OPP = '#c4572a'; // opposition burnt orange
 
 export default async function Match({ params, searchParams }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', params.id).single();
-  if (!m) notFound();
+  if (!m || !(await matchVisible(m))) notFound();
   if (!gradeOk(await currentAccess(), m.competitions?.grade)) notFound();
+  const org = await currentOrg();
   const role = await currentRole();
   // Underage names are hidden from viewers; admins see them.
   const showNames = m.competitions.show_player_names !== false || role === 'admin';
@@ -39,7 +41,7 @@ export default async function Match({ params, searchParams }) {
 
   const aliases = await getAliases();
   const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
-  const rosIdx = teams.findIndex((t) => /roscommon/i.test(t.name));
+  const rosIdx = teams.findIndex((t) => isOurTeam(org, t.name));
   const colors = teams.map((_, i) => (rosIdx === -1 ? (i === 0 ? ROS : OPP) : i === rosIdx ? ROS : OPP));
   const [A, B] = teams.map((t, i) => ({ ...t, color: colors[i] }));
 

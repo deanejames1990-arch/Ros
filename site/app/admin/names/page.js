@@ -3,6 +3,7 @@ import { analyseMatch } from '../../../lib/analysis';
 import { nameEvents, isNumberTag } from '../../../lib/players';
 import { getAliases, ALIAS_SQL } from '../../../lib/aliases';
 import NameRows from './NameRows';
+import { scoped, orgScope, inOrg, onlyOrgTeams } from '../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Tidy names · James Deane Analysis' };
@@ -41,15 +42,16 @@ function looksSame(a, b) {
 export default async function TidyNames({ searchParams }) {
   const { error: tableErr } = await db.from('name_aliases').select('id').limit(1);
   const missing = tableErr && /does not exist|could not find|schema cache/i.test(tableErr.message);
-  const { data: teams } = await db.from('teams').select('id, name').order('name');
+  const { data: allTeams } = await db.from('teams').select('id, name').order('name');
+  const teams = await onlyOrgTeams(allTeams);
   const team = (teams || []).find((t) => t.name.toLowerCase() === String(searchParams.team || '').toLowerCase());
 
   let rows = [], squad = [], byNumber = [], dupes = [];
   if (team && !missing) {
     const [{ data: games }, { data: apps }, aliases] = await Promise.all([
-      db.from('matches').select('id, match_date, team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)')
+      (await orgScope())(db.from('matches').select('id, match_date, team1_id, team2_id, team1:teams!team1_id(name), team2:teams!team2_id(name)'))
         .or(`team1_id.eq.${team.id},team2_id.eq.${team.id}`),
-      db.from('appearances').select('match_id, team_id, jersey_no, players(id, name)').eq('team_id', team.id).limit(5000),
+      db.from('appearances').select('match_id, team_id, jersey_no, players(id, name)').eq('team_id', team.id).limit(5000).then(async (r) => ({ data: await inOrg(r.data) })),
       getAliases(),
     ]);
     const mine = aliases.filter((a) => a.team_id === team.id);

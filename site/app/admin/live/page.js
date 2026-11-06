@@ -2,16 +2,20 @@ import { db, MATCH_SELECT } from '../../../lib/db';
 import { score } from '../../components';
 import StartForm from './StartForm';
 import { currentAccess, gradeOk } from '../../../lib/session';
+import { scoped, orgScope, pickerTeams, onlyOrgComps, currentOrg } from '../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Live tagger · James Deane Analysis' };
 
 export default async function LivePage() {
-  const [{ data: teams }, { data: comps }, { data: games }] = await Promise.all([
+  const [{ data: allTeams }, { data: allComps }, { data: games }, org] = await Promise.all([
     db.from('teams').select('id,name').order('name'),
     db.from('competitions').select('id,name,grade,seasons(year)').order('id', { ascending: false }),
-    db.from('matches').select(MATCH_SELECT).like('match_code', 'LIVE-%').order('match_date', { ascending: false }).limit(20),
+    (await orgScope())(db.from('matches').select(MATCH_SELECT)).like('match_code', 'LIVE-%').order('match_date', { ascending: false }).limit(20),
+    currentOrg(),
   ]);
+  const teams = await pickerTeams(allTeams);
+  const comps = await onlyOrgComps(allComps);
   const access = await currentAccess();
   const competitions = (comps || []).filter((c) => gradeOk(access, c.grade))
     .map((c) => ({ id: c.id, name: c.name, grade: c.grade, year: c.seasons?.year }))
@@ -38,7 +42,7 @@ export default async function LivePage() {
         </>
       )}
       <h2>Start a game</h2>
-      <StartForm teams={(teams || []).map((t) => t.name)} competitions={competitions} today={new Date().toISOString().slice(0, 10)} />
+      <StartForm us={org.team_name} teams={(teams || []).map((t) => t.name)} competitions={competitions} today={new Date().toISOString().slice(0, 10)} />
     </>
   );
 }

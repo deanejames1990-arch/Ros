@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../lib/db';
-import { requireAdmin } from '../../lib/session';
+import { requireAdmin, requireSuper, currentAccess } from '../../lib/session';
+import { assertMatch, currentOrg } from '../../lib/org';
 
 const clean = (s) => String(s ?? '').trim();
 const num = (v) => (v === '' || v == null ? 0 : Math.max(0, parseInt(v, 10) || 0));
@@ -28,6 +29,7 @@ export async function updateGame(_prev, form) {
   try {
     await requireAdmin();
     const id = Number(form.get('id'));
+    await assertMatch(id);
     const [t1, t2] = await Promise.all([teamId(form.get('team1')), teamId(form.get('team2'))]);
     if (t1 === t2) throw new Error('The two teams are the same.');
     const oldT1 = Number(form.get('old_team1'));
@@ -61,6 +63,7 @@ export async function deleteGame(_prev, form) {
   try {
     await requireAdmin();
     const id = Number(form.get('id'));
+    await assertMatch(id);
     if (clean(form.get('confirm')).toUpperCase() !== 'DELETE') throw new Error('Type DELETE to confirm.');
     for (const t of ['events', 'appearances', 'match_stats']) {
       const { error } = await db.from(t).delete().eq('match_id', id);
@@ -76,10 +79,21 @@ export async function deleteGame(_prev, form) {
 }
 
 // ---- Competitions --------------------------------------------------------
+// Competitions are shared rows: an organisation's admin can change one only
+// if every game in it is theirs (otherwise it's for the site owner).
+async function compIsMine(id) {
+  const a = await currentAccess();
+  if (a?.isSuper) return;
+  const o = await currentOrg();
+  if (!o.ready) return;
+  const { data } = await db.from('matches').select('org_id').eq('competition_id', id);
+  if ((data || []).some((m) => m.org_id !== o.id)) throw new Error('Other organisations use this competition too, so only the site owner can change it.');
+}
 export async function updateCompetition(_prev, form) {
   try {
     await requireAdmin();
     const id = Number(form.get('id'));
+    await compIsMine(id);
     const row = {
       name: clean(form.get('name')),
       grade: clean(form.get('grade')) || 'Senior',
@@ -98,7 +112,7 @@ export async function updateCompetition(_prev, form) {
 // Moves every game from one competition into another, then removes the empty one.
 export async function mergeCompetition(_prev, form) {
   try {
-    await requireAdmin();
+    await requireSuper();
     const from = Number(form.get('id'));
     const into = Number(form.get('into'));
     if (!into || into === from) throw new Error('Choose a different competition to merge into.');
@@ -132,7 +146,7 @@ async function gamesOf(id) {
 
 export async function renameTeam(_prev, form) {
   try {
-    await requireAdmin();
+    await requireSuper();
     const id = Number(form.get('id'));
     const name = clean(form.get('name'));
     if (!id || !name) throw new Error('Give the team a name.');
@@ -154,7 +168,7 @@ export async function renameTeam(_prev, form) {
 // names), then removes the first: e.g. "York" into "New York".
 export async function mergeTeam(_prev, form) {
   try {
-    await requireAdmin();
+    await requireSuper();
     const from = Number(form.get('id'));
     const into = Number(form.get('into'));
     if (!into || into === from) throw new Error('Choose a different team to merge into.');
@@ -182,7 +196,7 @@ export async function mergeTeam(_prev, form) {
 // Removes a team with no games (e.g. a stray name from a file).
 export async function deleteTeam(_prev, form) {
   try {
-    await requireAdmin();
+    await requireSuper();
     const id = Number(form.get('id'));
     const ids = await gamesOf(id);
     if (ids.length) throw new Error(`This team has ${ids.length} game${ids.length === 1 ? '' : 's'}: merge it into the right team, or delete those games first.`);

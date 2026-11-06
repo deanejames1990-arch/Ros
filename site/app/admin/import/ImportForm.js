@@ -28,7 +28,8 @@ function readExport(bytes, name) {
 const matchName = (list, guess) =>
   list.find((t) => t.toLowerCase() === (guess || '').toLowerCase()) || guess || '';
 
-export default function ImportForm({ teams, competitions, existingCodes, games = [] }) {
+export default function ImportForm({ teams, competitions, existingCodes, games = [], ourTeam = 'Roscommon' }) {
+  const ours = (n) => new RegExp(`^${String(ourTeam).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(String(n || ''));
   const [src, setSrc] = useState(null); // { json, fileName }
   const [err, setErr] = useState(null);
   const [f, setF] = useState({});
@@ -54,14 +55,14 @@ export default function ImportForm({ teams, competitions, existingCodes, games =
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { json } = readExport(bytes, file.name);
       const first = parseNacsport(json, { fileName: file.name });
-      const g = guessFromName(file.name, first.video);
+      const g = guessFromName(file.name, first.video, ourTeam);
       const team1 = matchName(teams, g.home);
       const team2 = matchName(teams, g.away);
-      // In the TA/TB template TA is Roscommon; in HOME/AWAY the first-named team is home.
+      // In the TA/TB template TA is our team; in HOME/AWAY the first-named team is home.
       // Team-named buttons ("GALWAY POSS"): team A is whichever team the file names first.
       const aIsTeam1 = first.sideNames
         ? (matchName(teams, first.sideNames.A) || first.sideNames.A).toLowerCase() !== String(team2 || '').toLowerCase()
-        : first.template === 'TA/TB' || first.template === 'OUR/OPP' ? !/roscommon/i.test(team2) || /roscommon/i.test(team1) : true;
+        : first.template === 'TA/TB' || first.template === 'OUR/OPP' ? !ours(team2) || ours(team1) : true;
       const year = Number((g.date || '').slice(0, 4)) || new Date().getFullYear();
       // Match an existing competition on year, name and grade. A senior guess
       // never lands in an underage competition, and the reverse.

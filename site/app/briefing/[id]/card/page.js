@@ -10,6 +10,7 @@ import { targetFor } from '../../../../lib/targets';
 import CardView from './CardView';
 import { playerShotZones } from '../../../report/sections';
 import { suggestKeyMessages } from '../../../../lib/briefing-suggest';
+import { currentOrg } from '../../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Briefing infographic · James Deane Analysis' };
@@ -24,6 +25,7 @@ export default async function BriefingCard({ params }) {
   const admin = access?.role === 'admin';
   const { data: b } = await db.from('briefings').select('*').eq('id', Number(params.id)).single();
   if (!b || (!b.published && !admin)) notFound();
+  { const o = await currentOrg(); if (o.ready && b.org_id !== o.id) notFound(); }
   const [d, crests] = await Promise.all([briefingData(b.team_id, b.game_ids, access, admin), getCrests()]);
   if (!d) notFound();
   const { team, rows, tagged, mine, opp } = d;

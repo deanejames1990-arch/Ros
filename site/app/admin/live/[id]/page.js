@@ -4,20 +4,22 @@ import { isLiveCode, isFinishedCode } from '../../../../lib/live';
 import { sheetData } from '../../../../lib/sheets-data';
 import Tagger from './Tagger';
 import { currentAccess, gradeOk } from '../../../../lib/session';
+import { currentOrg, isOurTeam, matchVisible } from '../../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Live tagger · James Deane Analysis' };
 
 export default async function LiveGame({ params }) {
   const { data: m } = await db.from('matches').select(MATCH_SELECT).eq('id', Number(params.id)).single();
-  if (!m) notFound();
+  if (!m || !(await matchVisible(m))) notFound();
+  const org = await currentOrg();
   if (!gradeOk(await currentAccess(), m.competitions?.grade)) notFound();
   if (!isLiveCode(m.match_code)) {
     return <p className="card">This game was imported from a file, so it can’t be tagged live. <a href={`/match/${m.id}`}>Open the dashboard</a>.</p>;
   }
   const teams = [{ id: m.team1_id, name: m.team1.name }, { id: m.team2_id, name: m.team2.name }];
   // Roscommon (or whoever "our team" is) on the left.
-  if (/roscommon/i.test(teams[1].name) && !/roscommon/i.test(teams[0].name)) teams.reverse();
+  if (isOurTeam(org, teams[1].name) && !isOurTeam(org, teams[0].name)) teams.reverse();
   const [events, sheets] = await Promise.all([loadEvents(m.id), sheetData(m.id, teams)]);
   const halfLen = Number(String(m.match_code).split('-')[2]) || (m.competitions?.grade === 'Senior' ? 35 : 30);
   return (

@@ -1,15 +1,19 @@
 import { db } from '../../../lib/db';
 import ImportForm from './ImportForm';
+import { scoped, pickerTeams, onlyOrgComps, currentOrg } from '../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Add a game · James Deane Analysis' };
 
 export default async function ImportPage() {
-  const [{ data: teams }, { data: comps }, { data: recent }] = await Promise.all([
+  const [{ data: allTeams }, { data: allComps }, { data: recent }, org] = await Promise.all([
     db.from('teams').select('id,name').order('name'),
     db.from('competitions').select('id,name,grade,seasons(year)').order('id', { ascending: false }),
-    db.from('matches').select('id, match_date, match_code, team1:teams!team1_id(name), team2:teams!team2_id(name), competitions(name, seasons(year))'),
+    scoped(db.from('matches').select('id, match_date, match_code, team1:teams!team1_id(name), team2:teams!team2_id(name), competitions(name, seasons(year))')),
+    currentOrg(),
   ]);
+  const teams = await pickerTeams(allTeams);
+  const comps = await onlyOrgComps(allComps);
   const competitions = (comps || [])
     .map((c) => ({ id: c.id, name: c.name, grade: c.grade, year: c.seasons?.year }))
     .sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name));
@@ -23,6 +27,7 @@ export default async function ImportPage() {
         Loading the same file again updates that game instead of adding a copy.
       </p>
       <ImportForm
+        ourTeam={org.team_name}
         teams={(teams || []).map((t) => t.name)}
         competitions={competitions}
         existingCodes={(recent || []).map((r) => r.match_code).filter(Boolean)}

@@ -1,4 +1,14 @@
 import { db } from '../../../lib/db';
+import { scoped, currentOrg, onlyOrgComps } from '../../../lib/org';
+import { currentAccess } from '../../../lib/session';
+
+// This organisation's people (the site owner sees site owners too).
+async function scopedPeople(q) {
+  const a = await currentAccess();
+  const o = await currentOrg();
+  if (!o.ready) return q;
+  return a?.isSuper ? q.or(`org_id.eq.${o.id},role.eq.super`) : q.eq('org_id', o.id).neq('role', 'super');
+}
 import { getAvatars, AVATAR_SQL } from '../../../lib/avatars';
 import People from './People';
 
@@ -20,7 +30,7 @@ alter table site_users enable row level security;`;
 
 export default async function PeoplePage() {
   const [{ data: people, error }, { data: comps }, avatars] = await Promise.all([
-    db.from('site_users').select('id, name, email, role, grades, active, created_at, last_seen').order('name'),
+    scopedPeople(db.from('site_users').select('id, name, email, role, grades, active, created_at, last_seen').order('name')),
     db.from('competitions').select('grade'),
     getAvatars(),
   ]);
@@ -46,7 +56,7 @@ export default async function PeoplePage() {
         <p className="card check warn">{error.message}</p>
       ) : (
         <>
-          <People people={people || []} grades={grades} avatars={avatars.byId} />
+          <People people={people || []} grades={grades} avatars={avatars.byId} owner={Boolean((await currentAccess())?.isSuper)} />
           {!avatars.ready && (
             <details className="card small">
               <summary>Set up photos (one-off)</summary>

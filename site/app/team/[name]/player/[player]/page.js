@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { db } from '../../../../../lib/db';
 import Profile from '../../../../player/profile';
 import { getAliases } from '../../../../../lib/aliases';
+import { inOrg } from '../../../../../lib/org';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ export default async function TagPlayer({ params }) {
   // An old link by the tag name ("Lundy"): go to the tidied full name.
   const al = (await getAliases()).find((a) => ids.includes(a.team_id) && a.alias.toLowerCase() === name.toLowerCase());
   if (al) redirect(`/team/${encodeURIComponent(teams[0].name)}/player/${encodeURIComponent(al.name)}`);
-  const { data: apps } = await db.from('appearances').select('player_id, players(id, name)').in('team_id', ids).limit(5000);
+  const { data: allApps } = await db.from('appearances').select('match_id, player_id, players(id, name)').in('team_id', ids).limit(5000);
+  const apps = await inOrg(allApps);
   const saved = (apps || []).find((a) => a.players?.name?.toLowerCase() === name.toLowerCase());
   if (saved) redirect(`/player/${saved.players.id}`);
   return <Profile p={{ id: null, name }} teamIds={ids} />;

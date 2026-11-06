@@ -4,6 +4,7 @@ import { currentRole, currentAccess, gradeOk } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
 import { getAliases } from '../../lib/aliases';
+import { scoped, orgScope, inOrg } from '../../lib/org';
 import { ShotLegend, hasShotMap } from '../report/ShotMap';
 import ShotMapSet from '../report/ShotMapSet';
 import { ZoneGrid, ShotZones, splitShotZones } from '../report/sections';
@@ -28,14 +29,17 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
   const hidden = p.id ? (await hiddenPlayerIds([p.id])).size > 0 : false;
   if (hidden && !admin) notFound();
 
-  const { data: apps } = p.id
+  const { data: allApps } = p.id
     ? await db.from('appearances').select(`match_id, team_id, jersey_no, started, goals, points, matches(${MATCH_COLS})`).eq('player_id', p.id)
     : { data: [] };
+  // Only this organisation's games.
+  const apps = await inOrg(allApps);
+  if (p.id && allApps?.length && !apps.length) notFound();
   const sheetGames = (apps || []).filter((a) => a.matches);
   // Other games of the same team(s): the name may be in the tags without a sheet.
   const teamIds = [...new Set([...givenTeams, ...sheetGames.map((a) => a.team_id)])];
   const { data: teamGames } = teamIds.length
-    ? await db.from('matches').select(MATCH_COLS).or(`team1_id.in.(${teamIds.join(',')}),team2_id.in.(${teamIds.join(',')})`)
+    ? await (await orgScope())(db.from('matches').select(MATCH_COLS)).or(`team1_id.in.(${teamIds.join(',')}),team2_id.in.(${teamIds.join(',')})`)
     : { data: [] };
   const have = new Set(sheetGames.map((a) => a.match_id));
   const extra = (teamGames || []).filter((m) => !have.has(m.id)).map((m) => ({
@@ -89,7 +93,8 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
   const teamsPlayed = [...new Set(games.map((g) => g.team))];
   let candidates = [];
   if (admin && p.id) {
-    const { data: mates } = teamIds.length ? await db.from('appearances').select('player_id, players(id, name)').in('team_id', teamIds).limit(5000) : { data: [] };
+    const { data: allMates } = teamIds.length ? await db.from('appearances').select('match_id, player_id, players(id, name)').in('team_id', teamIds).limit(5000) : { data: [] };
+    const mates = await inOrg(allMates);
     const seen = new Map();
     for (const x of mates || []) if (x.players && x.players.id !== p.id) seen.set(x.players.id, x.players);
     candidates = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
