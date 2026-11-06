@@ -129,7 +129,7 @@ function Card({ m }) {
                     <div className="ig-tscore"><b>{sc(p.goals, p.points)}</b></div>
                     <div className="ig-tstats">in {p.games} game{p.games === 1 ? '' : 's'}<br />{p.scores}/{p.shots} shots{p.frees ? <><br />{p.frees} from frees</> : ''}{p.two ? <><br />{p.two} two-pointer{p.two === 1 ? '' : 's'}</> : ''}</div>
                   </div>
-                  {p.zones ? <Boxes zones={p.zones} color={GOLD} small kind="shot" /> : <div className="ig-tnozones">No shot boxes tagged</div>}
+                  {p.zones ? <Boxes zones={p.zones} color={GOLD} small kind="shot" /> : <div className="ig-tnozones">No boxes from play</div>}
                 </div>
               </div>
             ))}

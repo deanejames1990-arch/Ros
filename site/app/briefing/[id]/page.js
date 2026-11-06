@@ -6,8 +6,9 @@ import { getCrests } from '../../../lib/crests';
 import Crest from '../../Crest';
 import { pssSummary, quarterTrend } from '../../../lib/pss';
 import { targetFor } from '../../../lib/targets';
-import { KickoutSection, ShootingSection, TurnoverSection, PlayerTable, PssTable, QuarterTrend, ZoneGrid, playerHref } from '../../report/sections';
-import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
+import { KickoutSection, ShootingSection, TurnoverSection, PlayerTable, PssTable, QuarterTrend, ZoneGrid, ShotZones, playerShotZones, playerHref } from '../../report/sections';
+import { ShotLegend, hasShotMap } from '../../report/ShotMap';
+import ShotMapSet from '../../report/ShotMapSet';
 import { PrintButton, SectionImages } from '../../report/Export';
 import Editor from './Editor';
 import { suggestKeyMessages } from '../../../lib/briefing-suggest';
@@ -127,14 +128,13 @@ export default async function Briefing({ params, searchParams }) {
                 <div className="vs-heading">Where their main shooters shoot from (box, attacking goal at the bottom)</div>
                 <div className="shooter-grids">
                   {topShooters.map((p) => {
-                    const zones = Object.fromEntries(Object.entries(p.boxes).map(([z, n]) => [z, { n, won: p.boxesScored?.[z] || 0 }]));
-                    return <ZoneGrid key={p.name} name={`${p.name} · ${sc(p.goals, p.points)}`} zones={zones} color={TEAM} kind="shot" />;
+                    return <ShotZones key={p.name} name={`${p.name} · ${sc(p.goals, p.points)}`} zones={playerShotZones(p)} color={TEAM} />;
                   })}
                 </div>
               </div>
             )}
             {hasShotMap(allEvents) && (
-              <div className="card"><div className="shotmaps one"><ShotMap events={allEvents} teamId={0} name={team.name} color={TEAM} /></div><ShotLegend /></div>
+              <div className="card"><ShotMapSet one events={allEvents} maps={[{ teamId: 0, name: team.name, color: TEAM }]} /><ShotLegend /></div>
             )}
             <ShootingSection A={A} B={B} a={mine} b={opp} />
           </Part>

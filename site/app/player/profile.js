@@ -4,8 +4,9 @@ import { currentRole, currentAccess, gradeOk } from '../../lib/session';
 import { analyseMatch, isShot } from '../../lib/analysis';
 import { nameEvents } from '../../lib/players';
 import { getAliases } from '../../lib/aliases';
-import { ShotMap, ShotLegend, hasShotMap } from '../report/ShotMap';
-import { ZoneGrid } from '../report/sections';
+import { ShotLegend, hasShotMap } from '../report/ShotMap';
+import ShotMapSet from '../report/ShotMapSet';
+import { ZoneGrid, ShotZones, splitShotZones } from '../report/sections';
 import MergePlayer from './[id]/MergePlayer';
 
 
@@ -138,9 +139,12 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
       {(() => {
         // Shots by box, where the tagging records a box (no exact spot).
         const zones = {};
+        const freeZ = {};
         for (const g of games) {
           for (const [z, n] of Object.entries(g.row?.boxes || {})) (zones[z] ||= { n: 0, won: 0 }).n += n;
           for (const [z, n] of Object.entries(g.row?.boxesScored || {})) (zones[z] ||= { n: 0, won: 0 }).won += n;
+          for (const [z, n] of Object.entries(g.row?.boxesFree || {})) (freeZ[z] ||= { n: 0, won: 0 }).n += n;
+          for (const [z, n] of Object.entries(g.row?.boxesFreeScored || {})) (freeZ[z] ||= { n: 0, won: 0 }).won += n;
         }
         const tot = Object.values(zones).reduce((a, z) => a + z.n, 0);
         if (!tot) return null;
@@ -149,9 +153,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
           <>
             <h2>Shots by box</h2>
             <div className="card">
-              <div style={{ maxWidth: 380, margin: '0 auto' }}>
-                <ZoneGrid name={p.name} zones={zones} color="#3b4f9e" kind="shot" />
-              </div>
+              <ShotZones name="" zones={splitShotZones(zones, freeZ)} color="#3b4f9e" />
               <p className="muted small center">Attacking goal at the bottom. {tot} shots with a box tagged, from {boxGames} of {games.length} game{games.length === 1 ? '' : 's'}.</p>
             </div>
           </>
@@ -162,7 +164,7 @@ export default async function Profile({ p, teamIds: givenTeams = [] }) {
         <>
           <h2>Shot map</h2>
           <div className="card">
-            <div className="shotmaps one"><ShotMap events={myShots} teamId={0} name={p.name} color="#3b4f9e" /></div>
+            <ShotMapSet one events={myShots} maps={[{ teamId: 0, name: p.name, color: '#3b4f9e' }]} />
             <ShotLegend />
           </div>
         </>

@@ -8,6 +8,7 @@ import { getCrests } from '../../../../lib/crests';
 import { quarterTrend } from '../../../../lib/pss';
 import { targetFor } from '../../../../lib/targets';
 import CardView from './CardView';
+import { playerShotZones } from '../../../report/sections';
 import { suggestKeyMessages } from '../../../../lib/briefing-suggest';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,8 @@ export default async function BriefingCard({ params }) {
     .map((p) => ({
       name: p.name, goals: p.goals, points: p.points, games: p.games || 1, shots: p.shots, scores: p.scores,
       conv: p.shots ? Math.round((100 * p.scores) / p.shots) : null, frees: p.freesScored || 0, two: p.twoScored || 0,
-      zones: Object.values(p.boxes || {}).reduce((t, k) => t + k, 0) >= 3 ? Object.fromEntries(Object.entries(p.boxes || {}).map(([z, k]) => [z, { n: k, won: p.boxesScored?.[z] || 0 }])) : null,
+      // From play only: frees are taken where the foul was, not where he chose to shoot.
+      zones: (() => { const z = playerShotZones(p).play; return Object.values(z).reduce((t, r) => t + r.n, 0) >= 3 ? z : null; })(),
     }));
 
   const ko = mine?.kickouts;

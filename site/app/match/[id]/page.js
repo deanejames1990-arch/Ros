@@ -5,7 +5,8 @@ import { analyseMatch, PERIODS, QUARTERS, quarterOf, halfOf, withoutNames } from
 import { score } from '../../components';
 import { Versus, ScoringFlow, SourceBars, pctTxt } from './charts';
 import { PrintButton, SectionImages } from '../../report/Export';
-import { ShotMap, ShotLegend, hasShotMap } from '../../report/ShotMap';
+import { ShotLegend, hasShotMap } from '../../report/ShotMap';
+import ShotMapSet from '../../report/ShotMapSet';
 import { isLiveCode, isLiveNow } from '../../../lib/live';
 import LiveRefresh from './LiveRefresh';
 import Trends from '../../report/Trends';
@@ -220,10 +221,7 @@ export default async function Match({ params, searchParams }) {
             <>
               <h2>Shot maps{period !== 'All' && <span className="muted"> · {period}</span>}</h2>
               <div className="card">
-                <div className="shotmaps">
-                  <ShotMap events={r.events} teamId={A.id} name={A.name} color={A.color} />
-                  <ShotMap events={r.events} teamId={B.id} name={B.name} color={B.color} />
-                </div>
+                <ShotMapSet events={r.events} maps={[{ teamId: A.id, name: A.name, color: A.color }, { teamId: B.id, name: B.name, color: B.color }]} />
                 <ShotLegend />
               </div>
             </>

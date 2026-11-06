@@ -130,6 +130,39 @@ const rate = (a, b) => (b ? Math.round((100 * a) / b) : null);
 export const GRID = [['2', '3', '4'], ['5', '6', '7'], ['8', '0', '9'], ['10', '11', '12'], ['13', '14', '15']];
 
 // kind 'ko': kick-outs per box with won/lost; kind 'shot': shots per box with scored.
+// Shot boxes split into from play and from frees. all / free: { box: { n, won } }.
+export function splitShotZones(all = {}, free = {}) {
+  const play = {};
+  for (const [z, r] of Object.entries(all)) {
+    const f = free[z] || { n: 0, won: 0 };
+    if (r.n - f.n > 0) play[z] = { n: r.n - f.n, won: r.won - f.won };
+  }
+  return { play, free: Object.fromEntries(Object.entries(free).filter(([, r]) => r.n > 0)) };
+}
+// From a player row (boxes / boxesScored / boxesFree / boxesFreeScored).
+export const playerShotZones = (p) => splitShotZones(
+  Object.fromEntries(Object.entries(p?.boxes || {}).map(([z, n]) => [z, { n, won: p.boxesScored?.[z] || 0 }])),
+  Object.fromEntries(Object.entries(p?.boxesFree || {}).map(([z, n]) => [z, { n, won: p.boxesFreeScored?.[z] || 0 }])),
+);
+// From a team side (shotBoxes / shotBoxesFree).
+export const teamShotZones = (s) => splitShotZones(
+  Object.fromEntries(Object.entries(s?.shotBoxes || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }])),
+  Object.fromEntries(Object.entries(s?.shotBoxesFree || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }])),
+);
+const total = (z) => Object.values(z).reduce((t, r) => t + r.n, 0);
+
+// Two grids, from play and frees; the frees grid only when frees have boxes.
+export function ShotZones({ name, zones, color }) {
+  const p = total(zones.play), f = total(zones.free);
+  if (!p && !f) return null;
+  return (
+    <div className="shot-split">
+      {p > 0 && <ZoneGrid name={`${name ? `${name} · ` : ''}from play (${p})`} zones={zones.play} color={color} kind="shot" />}
+      {f > 0 && <ZoneGrid name={`${name ? `${name} · ` : ''}frees, 45s, marks (${f})`} zones={zones.free} color={color} kind="shot" />}
+    </div>
+  );
+}
+
 export function ZoneGrid({ name, zones, color, kind = 'ko' }) {
   const max = Math.max(1, ...Object.values(zones).map((z) => z.n));
   return (
@@ -227,9 +260,9 @@ export function ShootingSection({ A, B, a, b }) {
         {boxes.length > 0 && (
           <>
             <div className="vs-heading">Where shots were taken (box number, attacking goal at the bottom)</div>
-            <div className="zones">
-              <ZoneGrid name={A.name} kind="shot" color={A.color} zones={Object.fromEntries(Object.entries(a.shotBoxes || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }]))} />
-              <ZoneGrid name={B.name} kind="shot" color={B.color} zones={Object.fromEntries(Object.entries(b.shotBoxes || {}).map(([z, r]) => [z, { n: r.shots, won: r.scored }]))} />
+            <div className="zones split">
+              <ShotZones name={A.name} color={A.color} zones={teamShotZones(a)} />
+              <ShotZones name={B.name} color={B.color} zones={teamShotZones(b)} />
             </div>
           </>
         )}

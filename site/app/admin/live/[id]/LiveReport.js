@@ -4,7 +4,8 @@ import { useRef, useState } from 'react';
 import { analyseMatch, QUARTERS } from '../../../../lib/analysis';
 import { Versus } from '../../../match/[id]/charts';
 import { ZoneGrid } from '../../../report/sections';
-import { ShotMap, ShotLegend } from '../../../report/ShotMap';
+import { ShotLegend } from '../../../report/ShotMap';
+import ShotMapSet from '../../../report/ShotMapSet';
 import { Pss } from '../../../report/sections';
 import { targetFor, targetText, hit } from '../../../../lib/targets';
 
@@ -128,10 +129,7 @@ export default function LiveReport({ rows, teams, match, initial = 'All' }) {
         {(a.shots > 0 || b.shots > 0) && (
           <div className="card">
             <div className="vs-heading">Shot maps (attacking the goal at the top)</div>
-            <div className="shotmaps">
-              <ShotMap events={inPeriod} teamId={teams[0].id} name={A.name} color={A.color} />
-              <ShotMap events={inPeriod} teamId={teams[1].id} name={B.name} color={B.color} />
-            </div>
+            <ShotMapSet events={inPeriod} maps={[{ teamId: teams[0].id, name: A.name, color: A.color }, { teamId: teams[1].id, name: B.name, color: B.color }]} />
             <ShotLegend />
           </div>
         )}

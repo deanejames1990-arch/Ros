@@ -38,6 +38,9 @@ export function quarterOf(e) {
 }
 
 // Box number from a "Box 5" style tag, as a string ('0'..'15'), or null.
+// Frees, 45s, marks and penalties: shots from a placed ball.
+export const isPlacedShot = (e) => /\((F|45|Mark|Pen)/i.test(e.event_type || '');
+
 export const zoneOf = (e) => {
   const z = lbl(e, 'Zone');
   const m = z && String(z).match(/(\d+)/);
@@ -217,13 +220,17 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
     };
 
     // Boxes: where shots were taken and where own kick-outs landed
+    // shotBoxes: every shot; shotBoxesFree: frees / 45s / marks only (from play = the difference).
     const shotBoxes = {};
+    const shotBoxesFree = {};
     for (const s of shots) {
       const z = zoneOf(s.e);
       if (z == null) continue;
-      const r = (shotBoxes[z] ||= { shots: 0, scored: 0 });
-      r.shots += 1;
-      if (s.value) r.scored += 1;
+      for (const box of isPlacedShot(s.e) ? [shotBoxes, shotBoxesFree] : [shotBoxes]) {
+        const r = (box[z] ||= { shots: 0, scored: 0 });
+        r.shots += 1;
+        if (s.value) r.scored += 1;
+      }
     }
     const koZones = {};
     for (const k of kos) {
@@ -279,6 +286,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
       shotsDetail,
       ptsPerShot: shots.length ? pointsTotal / shots.length : null,
       shotBoxes,
+      shotBoxesFree,
       kickoutZones: koZones,
       quarters,
       halves,
@@ -296,7 +304,7 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
     return (playerRows[tid][key.toLowerCase()] ||= {
       name: key, games: 1, shots: 0, scores: 0, points: 0, goals: 0, twoTried: 0, twoScored: 0, oneTried: 0, oneScored: 0,
       frees: 0, freesScored: 0, wides: 0, poss: 0, attacks: 0, koWon: 0, freesWon: 0, turnoversLost: 0, cards: 0,
-      tackles: 0, assists: 0, winbacks: 0, boxes: {}, boxesScored: {}, twoTrackedGames: twoTracked ? 1 : 0,
+      tackles: 0, assists: 0, winbacks: 0, boxes: {}, boxesScored: {}, boxesFree: {}, boxesFreeScored: {}, twoTrackedGames: twoTracked ? 1 : 0,
     });
   };
   const namesOf = (e) => {
@@ -339,7 +347,10 @@ export function analyseMatch({ events: given = [], teams, match = null, period =
       if (placed) { r.frees += 1; if (v) r.freesScored += 1; }
       if (!v && /wide/i.test(e.outcome || '')) r.wides += 1;
       const z = zoneOf(e);
-      if (z != null) { r.boxes[z] = (r.boxes[z] || 0) + 1; if (v) r.boxesScored[z] = (r.boxesScored[z] || 0) + 1; }
+      if (z != null) {
+        r.boxes[z] = (r.boxes[z] || 0) + 1; if (v) r.boxesScored[z] = (r.boxesScored[z] || 0) + 1;
+        if (isPlacedShot(e)) { r.boxesFree[z] = (r.boxesFree[z] || 0) + 1; if (v) r.boxesFreeScored[z] = (r.boxesFreeScored[z] || 0) + 1; }
+      }
     } else if (e.event_type === 'Poss' || e.event_type === 'Attack') {
       for (const n of names) { const r = prow(e.team_id, n); if (r) r[e.event_type === 'Poss' ? 'poss' : 'attacks'] += 1; }
     } else if (e.event_type === 'Kickout') {
@@ -423,7 +434,7 @@ export function combineSides(list) {
     turnoversWon: 0, turnoversLost: 0, fouls: 0,
     shotsDetail: { singles: 0, twoTried: 0, twoScored: 0, twoScoredTracked: 0, twoTrackedGames: 0, goals: 0, wides: 0, savedBlocked: 0 },
     kickouts: { total: 0, wonClean: 0, wonBreak: 0, lostBreak: 0, lostClean: 0, unknown: 0, retained: 0 },
-    koDist: {}, shotBoxes: {}, kickoutZones: {},
+    koDist: {}, shotBoxes: {}, shotBoxesFree: {}, kickoutZones: {},
     quarters: QUARTERS.map((q) => ({ key: q, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
     halves: ['H1', 'H2'].map((h) => ({ key: h, points: 0, shots: 0, koWon: 0, koTotal: 0 })),
     thirds: { conceded: { Def: 0, Mid: 0, Att: 0, none: 0 }, wonBack: { Def: 0, Mid: 0, Att: 0, none: 0 } },
@@ -438,8 +449,10 @@ export function combineSides(list) {
       const r = (out.koDist[d.dist] ||= { dist: d.dist, total: 0, won: 0 });
       r.total += d.total; r.won += d.won;
     }
-    for (const [z, r] of Object.entries(s.shotBoxes || {})) {
-      const o = (out.shotBoxes[z] ||= { shots: 0, scored: 0 }); o.shots += r.shots; o.scored += r.scored;
+    for (const k of ['shotBoxes', 'shotBoxesFree']) {
+      for (const [z, r] of Object.entries(s[k] || {})) {
+        const o = (out[k][z] ||= { shots: 0, scored: 0 }); o.shots += r.shots; o.scored += r.scored;
+      }
     }
     for (const [z, r] of Object.entries(s.kickoutZones || {})) {
       const o = (out.kickoutZones[z] ||= { n: 0, won: 0 }); o.n += r.n; o.won += r.won;
@@ -451,10 +464,11 @@ export function combineSides(list) {
     for (const pl of s.players || []) {
       const k = pl.name.toLowerCase();
       const o = out.players[k];
-      if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes }, boxesScored: { ...(pl.boxesScored || {}) } }; continue; }
+      if (!o) { out.players[k] = { ...pl, boxes: { ...pl.boxes }, boxesScored: { ...(pl.boxesScored || {}) }, boxesFree: { ...(pl.boxesFree || {}) }, boxesFreeScored: { ...(pl.boxesFreeScored || {}) } }; continue; }
       for (const f of ['games', 'shots', 'scores', 'points', 'goals', 'twoTried', 'twoScored', 'oneTried', 'oneScored', 'twoTrackedGames', 'frees', 'freesScored', 'wides', 'poss', 'attacks', 'koWon', 'freesWon', 'turnoversLost', 'cards', 'tackles', 'assists', 'winbacks']) o[f] += pl[f] || 0;
       for (const [z, n] of Object.entries(pl.boxes)) o.boxes[z] = (o.boxes[z] || 0) + n;
       for (const [z, n] of Object.entries(pl.boxesScored || {})) o.boxesScored[z] = (o.boxesScored[z] || 0) + n;
+      for (const f of ['boxesFree', 'boxesFreeScored']) { o[f] ||= {}; for (const [z, n] of Object.entries(pl[f] || {})) o[f][z] = (o[f][z] || 0) + n; }
     }
     for (const r of s.sources || []) {
       const o = (out.sources[r.source] ||= { source: r.source, shots: 0, scores: 0, points: 0 });
