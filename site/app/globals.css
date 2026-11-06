@@ -790,3 +790,11 @@ a.button{display:inline-block;background:var(--lime);border-radius:10px;padding:
 .xs-table details ul{margin:4px 0 0;padding-left:16px;text-align:left}
 .xs-actions{display:flex;gap:10px;align-items:center;margin-top:10px}
 .file-pick{display:flex;gap:10px;align-items:center;font-weight:600}
+.cov-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}
+.cov-tiles .card{display:flex;flex-direction:column;gap:2px}
+.cov-tiles b{font-size:1.6rem}.cov-tiles span{font-size:.85rem}.cov-tiles small{color:var(--mut);font-size:.75rem}
+.cov-table td,.cov-table th{white-space:nowrap}
+.cov-table tr.cov-first td{border-top:2px solid var(--line,#dde2ec)}
+.cov{font-weight:700}.cov small{font-weight:400;color:var(--mut)}
+.cov.good{color:#2e7d4f}.cov.part{color:#b26a00}.cov.none{color:#b3412e}
+.cov-gaps{margin:0;padding-left:18px;display:grid;gap:4px}
