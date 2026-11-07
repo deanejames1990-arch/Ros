@@ -46,6 +46,7 @@ export default async function Manage({ searchParams }) {
       {searchParams.deleted && <p className="card check ok small">Game deleted.</p>}
       {searchParams.merged && <p className="card check ok small">Competitions merged.</p>}
 
+      <a href="/admin/compare" className="card people-link"><b>Grades compared</b> <span className="muted small">U20 v Senior (or any two grades): how the game differs, from every tagged game</span></a>
       <a href="/admin/coverage" className="card people-link"><b>Data check</b> <span className="muted small">Which games are missing shot boxes, kick-out boxes, shooter names or team sheets</span></a>
       <a href="/admin/excel-shots" className="card people-link"><b>Shot boxes from Excel</b> <span className="muted small">Add shot boxes and shooters from an analyst’s workbook to games already on the site</span></a>
       <a href="/admin/names" className="card people-link"><b>Tidy names</b> <span className="muted small">Match the names in the tags (“Lundy”) to players’ full names, team by team</span></a>
